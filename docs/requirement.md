@@ -9,14 +9,11 @@
 
 ### **Database**
 
-* **Relational DB (PostgreSQL/MySQL)**
-  Quản lý User, Quan hệ bạn bè, Transaction.
 * **NoSQL (MongoDB)**
-  Quản lý Feed (bài viết), Comment, Chat History (AI).
-* **Redis**
-
-  * Caching: Danh sách tướng, Leaderboard.
-  * Real-time presence: Số người online.
+  Quản lý toàn bộ dữ liệu: Users/Profiles, Feed (bài viết), Comments, LFG (lobbies), AI chat/history.
+  - Sử dụng TTL Index cho: cache AI guide (24h), rate limit theo cửa sổ 1 giờ, dọn dẹp dữ liệu cũ (lobbies hết hạn, sessions) nếu cần.
+  - Quy ước ID: ưu tiên `_id` là UUID string thống nhất FE/BE (không dùng ObjectId). Nếu dùng ObjectId, cần trường `user_id` dạng UUID riêng cho liên kết. Khuyến nghị: dùng `_id` = UUID string.
+  - Schema: ưu tiên embed cho dữ liệu nhỏ/trung bình (vd: `users.hero_stats`, `lobbies.members`) để cập nhật atomic; tách collection riêng khi kích thước lớn hoặc truy vấn chuyên biệt (likes, comments).
 
 ### **AI Gateway**
 
@@ -41,9 +38,9 @@
 | email                      | string                         |                                  |
 | in_game_name               | string                         | Từ LLM extraction                |
 | avatar_url                 | string                         |                                  |
-| rank                       | Enum(BRONZE → CONQUEROR)       | cần lưu history                  |
+| rank      *                 | Enum(BRONZE → CONQUEROR)       | Từ LLM extraction                  |
 | main_role                  | Enum(TOP, JUNGLE, MID, AD, SP) |                                  |
-| level                      | int                            | Từ LLM extraction                |
+| level         *             | int                            | Từ LLM extraction                |
 | profile_screenshot_url     | string                         | Ảnh hồ sơ game để verify         |
 | profile_verified           | boolean                        | Đã xác thực hồ sơ chưa           |
 | profile_verified_at        | timestamp                      | Thời điểm xác thực               |
@@ -52,8 +49,6 @@
 
 * win_rate (float)
 * total_matches (int)
-* wins (int)
-* losses (int)
 * credibility_score (int) - Uy tín người chơi
 
 #### **Xác thực Hồ Sơ Game Thủ bằng LLM**
@@ -124,7 +119,7 @@
    ```
 4. Parse JSON response từ Gemini
 5. Nếu có `error` → HTTP 400 với message yêu cầu chụp lại
-6. Nếu thành công → Lưu vào DB và trả về thông tin đã trích xuất
+6. Nếu thành công → Lưu vào DB: cập nhật `users.in_game_name`, `users.level`, `users.stats` (win_rate, total_matches, credibility_score), `users.profile_verified = true`, `users.profile_verified_at`, `users.profile_screenshot_url`; sau đó trả về dữ liệu đã lưu
 
 **Output** (Success):
 ```json
@@ -228,7 +223,7 @@ Frontend đang gọi Gemini trực tiếp → phải chuyển toàn bộ sang Ba
 
 ### **AI Gateway Service**
 
-Backend sử dụng thư viện: `@google/genai`
+Backend sử dụng thư viện: `google-generativeai` (Python SDK)
 
 **Các tính năng sử dụng Gemini**:
 1. **Text Generation**: AI Coach, Hero Guide
@@ -252,7 +247,7 @@ Input:
 2. Prompt:
    `"Bạn là HLV Liên Quân... phân tích tướng {hero_name}..."`
 3. Gọi Gemini API
-4. Cache vào Redis 24h
+4. Cache vào Mongo 24h (TTL index trên trường `expires_at`)
 5. Output: Markdown string
 
 ---
@@ -296,6 +291,7 @@ Frontend: `components/Navigation.tsx`, `constants.ts`
 
 * Mọi API (trừ Register/Login) yêu cầu JWT
 * Rate Limit mạnh cho `/ai/*`
+* Rate limit và cache thực hiện bằng Mongo (counter + TTL index), không sử dụng Redis trong MVP
 * Validate file upload:
   - Kích thước tối đa: 5MB
   - Định dạng cho phép: JPG, PNG
@@ -317,6 +313,38 @@ Sử dụng WebSocket:
 
 ---
 
+## **Mongo Collections & Indexes (MVP)**
+
+* `users`
+  - Trường chính: username (unique), email (unique), password_hash, in_game_name, avatar_url, rank, main_role, level, profile_screenshot_url, profile_verified, profile_verified_at, stats{win_rate,total_matches,credibility_score}, hero_stats[] (name, matches_count, win_rate)
+  - Index: username unique, email unique
+* `posts`
+  - Trường: user_id, content, media_url, type, created_at, like_count, comment_count
+  - Index: type, created_at desc, user_id
+* `post_likes`
+  - Trường: post_id, user_id, created_at
+  - Index: unique compound (post_id, user_id) để idempotent like/unlike
+* `comments`
+  - Trường: post_id, user_id, content, created_at
+  - Index: post_id, created_at
+* `lobbies`
+  - Trường: owner_id, title, description, needed_roles[], max_slots, members[] (user_id, status), status (OPEN/FULL/CLOSED), created_at, updated_at, expires_at (optional)
+  - Index: status, created_at, owner_id, TTL trên `expires_at` nếu áp dụng
+* `ai_chat_history`
+  - Trường: user_id, session_id, messages[] (role, content, ts)
+  - Index: user_id, session_id (TTL optional để dọn sau N ngày)
+* `ai_guides_cache`
+  - Trường: hero_name (unique), md_content, expires_at
+  - Index: unique (hero_name), TTL trên `expires_at`
+* `rate_limits`
+  - Trường: key (user_id:endpoint hoặc ip:endpoint), window_start, count
+  - Index: unique (key, window_start), TTL trên `window_start`
+* `metadata_heroes`
+  - Trường: name, class, aliases
+  - Index: name
+
+---
+
 ## **JSON Response Mẫu — `GET /users/me`**
 
 ```json
@@ -335,8 +363,6 @@ Sử dụng WebSocket:
   "stats": {
     "win_rate": 52.5,
     "total_matches": 1245,
-    "wins": 320,
-    "losses": 180,
     "credibility_score": 95
   },
   "top_heroes": [
