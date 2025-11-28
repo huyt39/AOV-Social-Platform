@@ -1,33 +1,73 @@
-from sqlmodel import Session, create_engine, select
+"""MongoDB database connection and initialization."""
 
-from app import crud
+from beanie import init_beanie
+from motor.motor_asyncio import AsyncIOMotorClient
+
 from app.core.config import settings
-from app.models import User, UserCreate
+from app.models import Item, User
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
-
-
-# make sure all SQLModel models are imported (app.models) before initializing DB
-# otherwise, SQLModel might fail to initialize relationships properly
-# for more details: https://github.com/fastapi/full-stack-fastapi-template/issues/28
+# Global MongoDB client
+mongodb_client: AsyncIOMotorClient | None = None
 
 
-def init_db(session: Session) -> None:
-    # Tables should be created with Alembic migrations
-    # But if you don't want to use migrations, create
-    # the tables un-commenting the next lines
-    # from sqlmodel import SQLModel
+async def connect_to_mongodb() -> None:
+    """
+    Connect to MongoDB and initialize Beanie.
 
-    # This works because the models are already imported and registered from app.models
-    # SQLModel.metadata.create_all(engine)
+    This function should be called on application startup.
+    """
+    global mongodb_client
 
-    user = session.exec(
-        select(User).where(User.email == settings.FIRST_SUPERUSER)
-    ).first()
+    # Create MongoDB client
+    mongodb_client = AsyncIOMotorClient(settings.MONGODB_URL)
+
+    # Initialize Beanie with document models
+    await init_beanie(
+        database=mongodb_client[settings.MONGODB_DB_NAME],
+        document_models=[User, Item],  # Add all document models here
+    )
+
+    print(f"✅ Connected to MongoDB: {settings.MONGODB_DB_NAME}")
+
+
+async def close_mongodb_connection() -> None:
+    """
+    Close MongoDB connection.
+
+    This function should be called on application shutdown.
+    """
+    global mongodb_client
+
+    if mongodb_client:
+        mongodb_client.close()
+        print("❌ MongoDB connection closed")
+
+
+async def get_database():
+    """Get MongoDB database instance."""
+    if mongodb_client is None:
+        raise RuntimeError("MongoDB client is not initialized")
+    return mongodb_client[settings.MONGODB_DB_NAME]
+
+
+async def init_db() -> None:
+    """
+    Initialize database with first superuser.
+
+    This function creates the first superuser if it doesn't exist.
+    """
+    from app import crud
+    from app.models import UserCreate
+
+    # Check if superuser exists
+    user = await User.find_one(User.email == settings.FIRST_SUPERUSER)
+
     if not user:
         user_in = UserCreate(
             email=settings.FIRST_SUPERUSER,
             password=settings.FIRST_SUPERUSER_PASSWORD,
             is_superuser=True,
+            username="admin",  # Add default username for first superuser
         )
-        user = crud.create_user(session=session, user_create=user_in)
+        await crud.create_user(user_create=user_in)
+        print(f"✅ Created first superuser: {settings.FIRST_SUPERUSER}")
