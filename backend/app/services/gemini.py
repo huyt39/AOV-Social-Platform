@@ -1,17 +1,25 @@
-"""LangChain Vision API service for profile verification."""
+"""LangChain Vision API service for profile verification using trustcall."""
 
 import base64
-import json
 import logging
 from datetime import UTC, datetime
-from io import BytesIO
 from typing import Any
 
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+)
 from langchain_google_genai import ChatGoogleGenerativeAI
-from PIL import Image
+from trustcall import create_extractor
 
 from app.core.config import settings
+from app.llm.prompts import (
+    PROFILE_EXTRACTION_HUMAN_PROMPT,
+    PROFILE_EXTRACTION_SYSTEM_PROMPT,
+)
+from app.llm.schemas import ProfileExtraction
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +28,32 @@ class GeminiVisionService:
     """Service for interacting with Google Gemini Vision API via LangChain."""
 
     def __init__(self) -> None:
-        """Initialize Gemini Vision service with LangChain."""
+        """Initialize Gemini Vision service with LangChain and trustcall."""
         if not settings.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set in environment variables")
 
-        self.model = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro",
+        # Initialize LLM
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
             google_api_key=settings.GEMINI_API_KEY,
             temperature=0,
+            max_retries=2,
         )
+
+        # Create extraction prompt template
+        self.extraction_prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template(PROFILE_EXTRACTION_SYSTEM_PROMPT),
+            HumanMessagePromptTemplate.from_template(PROFILE_EXTRACTION_HUMAN_PROMPT),
+        ])
+
+        # Create extraction chain using trustcall
+        self.extraction_chain = self.extraction_prompt | create_extractor(
+            self.llm,
+            tools=[ProfileExtraction],
+            tool_choice="ProfileExtraction",
+        )
+
+        logger.info("GeminiVisionService initialized with LangChain extraction chain")
 
     async def verify_profile_screenshot(
         self, image_bytes: bytes
@@ -55,31 +80,10 @@ class GeminiVisionService:
             # Encode image to base64
             image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
-            # Prepare prompt for Gemini
-            prompt = """
-Phân tích ảnh màn hình hồ sơ game Liên Quân Mobile (Arena of Valor) này và trích xuất CHÍNH XÁC các thông tin sau dưới dạng JSON.
-
-Các trường bắt buộc:
-- level (integer): Cấp độ của người chơi
-- rank (string): Rank hiện tại (phải là một trong: BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, VETERAN, MASTER, CONQUEROR)
-- total_matches (integer): Tổng số trận đã chơi
-- win_rate (float): Tỷ lệ thắng (%) - chỉ số, không có ký hiệu %
-- credibility_score (integer): Điểm uy tín
-
-QUAN TRỌNG:
-1. Chỉ trả về JSON thuần túy, không có markdown, không có giải thích
-2. Nếu THIẾU BẤT KỲ trường nào, trả về: {"error": "Không đủ thông tin"}
-3. Rank phải chính xác là một trong các giá trị: BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, VETERAN, MASTER, CONQUEROR
-4. Tất cả các số phải là số thực/nguyên, không có đơn vị hoặc ký hiệu
-
-Ví dụ output hợp lệ:
-{"level": 30, "rank": "DIAMOND", "total_matches": 1234, "win_rate": 52.5, "credibility_score": 95}
-"""
-
-            # Create message with image using LangChain format
+            # Create message with image for vision model
             message = HumanMessage(
                 content=[
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": PROFILE_EXTRACTION_HUMAN_PROMPT},
                     {
                         "type": "image_url",
                         "image_url": f"data:image/jpeg;base64,{image_base64}",
@@ -87,73 +91,36 @@ Ví dụ output hợp lệ:
                 ]
             )
 
-            # Generate content with image via LangChain
-            response = await self.model.ainvoke([message])
+            extractor = create_extractor(
+                self.llm,
+                tools=[ProfileExtraction],
+                tool_choice="ProfileExtraction",
+            )
 
-            # Parse response from LangChain
-            response_text = response.content.strip()
+            result = await extractor.ainvoke([message])
 
-            # Remove markdown code blocks if present
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-
-            # Parse JSON
-            try:
-                data = json.loads(response_text)
-            except json.JSONDecodeError:
-                logger.error(f"Failed to parse JSON from Gemini response: {response_text}")
+            if not result.get("responses"):
+                logger.error("No responses from extraction chain")
                 return None
 
-            # Check for error
-            if "error" in data:
-                logger.warning(f"Gemini returned error: {data['error']}")
+            extraction: ProfileExtraction = result["responses"][0]
+
+            if not extraction.is_valid:
+                logger.warning(f"Profile extraction invalid: {extraction.error}")
                 return None
 
-            # Validate required fields
-            required_fields = [
-                "level",
-                "rank",
-                "total_matches",
-                "win_rate",
-                "credibility_score",
-            ]
+            data = {
+                "level": extraction.level,
+                "rank": extraction.rank,
+                "total_matches": extraction.total_matches,
+                "win_rate": extraction.win_rate,
+                "credibility_score": extraction.credibility_score,
+                "verified_at": datetime.now(UTC).isoformat(),
+            }
 
-            for field in required_fields:
-                if field not in data:
-                    logger.error(f"Missing required field: {field}")
-                    return None
-
-            # Validate rank
-            valid_ranks = [
-                "BRONZE",
-                "SILVER",
-                "GOLD",
-                "PLATINUM",
-                "DIAMOND",
-                "VETERAN",
-                "MASTER",
-                "CONQUEROR",
-            ]
-            if data["rank"].upper() not in valid_ranks:
-                logger.error(f"Invalid rank: {data['rank']}")
-                return None
-
-            # Normalize rank to uppercase
-            data["rank"] = data["rank"].upper()
-
-            # Type conversion
-            data["level"] = int(data["level"])
-            data["total_matches"] = int(data["total_matches"])
-            data["win_rate"] = float(data["win_rate"])
-            data["credibility_score"] = int(data["credibility_score"])
-
-            # Add verification timestamp
-            data["verified_at"] = datetime.now(UTC).isoformat()
-
-            logger.info(f"Successfully verified profile: Rank {data['rank']}, Level {data['level']}")
+            logger.info(
+                f"Successfully verified profile: Rank {data['rank']}, Level {data['level']}"
+            )
             return data
 
         except Exception as e:
