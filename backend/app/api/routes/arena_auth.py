@@ -8,6 +8,8 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.security import get_password_hash
+from pydantic import BaseModel, EmailStr
+
 from app.models import (
     ArenaUserRegister,
     Message,
@@ -20,6 +22,12 @@ from app.services.gemini import gemini_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["arena-auth"])
+
+
+class LoginRequest(BaseModel):
+    """Request model for login endpoint."""
+    email: EmailStr
+    password: str
 
 
 @router.post("/verify-profile")
@@ -96,7 +104,6 @@ async def verify_profile(
         "data": verified_data,
     }
 
-
 @router.post("/register")
 async def register_arena_user(
     user_in: ArenaUserRegister,
@@ -162,8 +169,7 @@ async def register_arena_user(
 
 @router.post("/login")
 async def login_arena_user(
-    email: str,
-    password: str,
+    login_data: LoginRequest,
 ) -> dict[str, Any]:
     """
     Login for Arena users.
@@ -178,9 +184,9 @@ async def login_arena_user(
     from app.core.security import verify_password
 
     # Find user by email
-    user = await User.find_one(User.email == email)
+    user = await User.find_one(User.email == login_data.email)
 
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     if not user.is_active:
