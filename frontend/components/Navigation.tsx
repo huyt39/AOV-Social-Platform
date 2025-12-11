@@ -1,5 +1,6 @@
 import React from 'react';
-import { Home, Users, Sword, MessageSquare, User as UserIcon } from 'lucide-react';
+import { Home, Users, Sword, MessageSquare, User as UserIcon, Settings, LogOut } from 'lucide-react';
+import { useAuth } from '../contexts/authContext';
 
 interface NavigationProps {
   activeTab: string;
@@ -7,12 +8,15 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
+  const { logout } = useAuth();
+  
   const navItems = [
     { id: 'feed', icon: Home, label: 'TRANG CHỦ' },
     { id: 'lfg', icon: Users, label: 'TÌM TEAM' },
     { id: 'guide', icon: Sword, label: 'CẨM NANG' },
     { id: 'coach', icon: MessageSquare, label: 'AI COACH' },
     { id: 'profile', icon: UserIcon, label: 'HỒ SƠ' },
+    { id: 'settings', icon: Settings, label: 'CÀI ĐẶT' },
   ];
 
   return (

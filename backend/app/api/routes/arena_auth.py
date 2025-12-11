@@ -18,6 +18,8 @@ from app.models import (
     User,
 )
 from app.services.gemini import gemini_service
+from app.services.image_upload import upload_image_to_imgbb
+from app.api.deps import CurrentUser
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +207,107 @@ async def login_arena_user(
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "avatar_url": user.avatar_url,
             "rank": user.rank.value if user.rank else None,
             "main_role": user.main_role.value if user.main_role else None,
+            "level": user.level,
+            "win_rate": user.win_rate,
+            "total_matches": user.total_matches,
+            "credibility_score": user.credibility_score,
         },
+    }
+
+
+@router.post("/upload-image")
+async def upload_image(
+    image: UploadFile = File(...),
+) -> dict[str, Any]:
+    """
+    Upload image to ImgBB.
+    
+    This endpoint can be used for uploading any image (avatars, posts, etc.).
+    Returns the URL of the uploaded image.
+    """
+    # Validate file type
+    if not image.content_type:
+        raise HTTPException(
+            status_code=400, detail="File type could not be determined"
+        )
+
+    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if image.content_type.lower() not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPG, PNG, GIF and WebP images are allowed",
+        )
+
+    content = await image.read()
+    max_size = 5 * 1024 * 1024  # 5MB
+
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail="File size exceeds 5MB limit",
+        )
+
+    try:
+        url = await upload_image_to_imgbb(content, image.filename)
+        return {
+            "success": True,
+            "url": url,
+        }
+    except ValueError as e:
+        logger.error(f"Image upload failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Image upload failed. Please try again.",
+        )
+
+
+@router.get("/me")
+async def get_current_profile(
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Get current authenticated user's profile.
+    """
+    return {
+        "success": True,
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "avatar_url": current_user.avatar_url,
+            "rank": current_user.rank.value if current_user.rank else None,
+            "main_role": current_user.main_role.value if current_user.main_role else None,
+            "level": current_user.level,
+            "win_rate": current_user.win_rate,
+            "total_matches": current_user.total_matches,
+            "credibility_score": current_user.credibility_score,
+            "profile_verified": current_user.profile_verified,
+        },
+    }
+
+
+class AvatarUpdate(BaseModel):
+    """Request model for avatar update."""
+    avatar_url: str
+
+
+@router.patch("/me/avatar")
+async def update_avatar(
+    avatar_data: AvatarUpdate,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Update current user's avatar URL.
+    """
+    current_user.avatar_url = avatar_data.avatar_url
+    await current_user.save()
+    
+    logger.info(f"User {current_user.username} updated avatar")
+    
+    return {
+        "success": True,
+        "avatar_url": current_user.avatar_url,
     }

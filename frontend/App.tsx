@@ -5,13 +5,16 @@ import { LFG } from './components/LFG';
 import { Guide } from './components/Guide';
 import { AICoach } from './components/AICoach';
 import { Profile } from './components/Profile';
+import { Settings } from './components/Settings';
 import { Register } from './components/Register';
 import { Login } from './components/Login';
+import { AuthProvider, useAuth } from './contexts/authContext';
 
-type Route = 'feed' | 'lfg' | 'guide' | 'coach' | 'profile' | 'register' | 'login';
+type Route = 'feed' | 'lfg' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('feed');
+  const { isLoading, isAuthenticated } = useAuth();
 
   // Simple hash-based routing
   useEffect(() => {
@@ -31,11 +34,25 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && currentRoute === 'profile') {
+      window.location.hash = 'login';
+    }
+  }, [isLoading, isAuthenticated, currentRoute]);
+
   const handleTabChange = (tab: string) => {
     window.location.hash = tab;
   };
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <div className="w-8 h-8 border-4 border-gold-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      );
+    }
+
     switch (currentRoute) {
       case 'register': return <Register />;
       case 'login': return <Login />;
@@ -44,6 +61,7 @@ const App: React.FC = () => {
       case 'guide': return <Guide />;
       case 'coach': return <AICoach />;
       case 'profile': return <Profile />;
+      case 'settings': return <Settings />;
       default: return <Feed />;
     }
   };
@@ -58,6 +76,14 @@ const App: React.FC = () => {
         {renderContent()}
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 

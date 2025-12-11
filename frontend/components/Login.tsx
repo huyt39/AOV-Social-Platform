@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, Sword, AlertCircle, Loader } from 'lucide-react';
+import { useAuth } from '../contexts/authContext';
 
 interface LoginFormData {
   email: string;
@@ -12,6 +13,7 @@ interface ValidationErrors {
 }
 
 export const Login: React.FC = () => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
@@ -83,12 +85,10 @@ export const Login: React.FC = () => {
         return;
       }
 
-      // Store JWT token
-      if (result.token) {
-        localStorage.setItem('auth_token', result.token);
+      if (result.token && result.user) {
+        login(result.token, result.user);
       }
 
-      // Redirect to feed
       window.location.hash = 'feed';
     } catch (error) {
       console.error('Login error:', error);

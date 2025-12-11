@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     # Gemini API Configuration
     GEMINI_API_KEY: str | None = None
 
+    # ImgBB API Configuration
+    IMGBB_API_KEY: str | None = None
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (
