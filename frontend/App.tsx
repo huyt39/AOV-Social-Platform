@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
 import { Feed } from './components/Feed';
 import { LFG } from './components/LFG';
+import { Friends } from './components/Friends';
 import { Guide } from './components/Guide';
 import { AICoach } from './components/AICoach';
 import { Profile } from './components/Profile';
@@ -10,17 +11,27 @@ import { Register } from './components/Register';
 import { Login } from './components/Login';
 import { AuthProvider, useAuth } from './contexts/authContext';
 
-type Route = 'feed' | 'lfg' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login';
+type Route = 'feed' | 'lfg' | 'friends' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login';
 
 const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('feed');
+  const [profileUserId, setProfileUserId] = useState<string | undefined>(undefined);
   const { isLoading, isAuthenticated } = useAuth();
 
   // Simple hash-based routing
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1) || 'feed';
-      setCurrentRoute(hash as Route);
+      
+      // Check for profile/:userId pattern
+      if (hash.startsWith('profile/')) {
+        const userId = hash.split('/')[1];
+        setProfileUserId(userId);
+        setCurrentRoute('profile');
+      } else {
+        setProfileUserId(undefined);
+        setCurrentRoute(hash as Route);
+      }
     };
 
     // Set initial route
@@ -35,10 +46,10 @@ const AppContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && currentRoute === 'profile') {
+    if (!isLoading && !isAuthenticated && currentRoute === 'profile' && !profileUserId) {
       window.location.hash = 'login';
     }
-  }, [isLoading, isAuthenticated, currentRoute]);
+  }, [isLoading, isAuthenticated, currentRoute, profileUserId]);
 
   const handleTabChange = (tab: string) => {
     window.location.hash = tab;
@@ -58,9 +69,10 @@ const AppContent: React.FC = () => {
       case 'login': return <Login />;
       case 'feed': return <Feed />;
       case 'lfg': return <LFG />;
+      case 'friends': return <Friends />;
       case 'guide': return <Guide />;
       case 'coach': return <AICoach />;
-      case 'profile': return <Profile />;
+      case 'profile': return <Profile userId={profileUserId} />;
       case 'settings': return <Settings />;
       default: return <Feed />;
     }

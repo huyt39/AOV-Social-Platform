@@ -289,6 +289,34 @@ async def get_current_profile(
     }
 
 
+@router.get("/users/{user_id}")
+async def get_user_profile(
+    user_id: str,
+) -> dict[str, Any]:
+    """
+    Get public profile of a user by ID.
+    """
+    user = await User.find_one(User.id == user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Người dùng không tồn tại")
+    
+    return {
+        "success": True,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "avatar_url": user.avatar_url,
+            "rank": user.rank.value if user.rank else None,
+            "main_role": user.main_role.value if user.main_role else None,
+            "level": user.level,
+            "win_rate": user.win_rate,
+            "total_matches": user.total_matches,
+            "credibility_score": user.credibility_score,
+        },
+    }
+
+
 class AvatarUpdate(BaseModel):
     """Request model for avatar update."""
     avatar_url: str

@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { useAuth } from '../contexts/authContext';
-import { Target, Shield, Hexagon, Camera, Loader } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { useAuth, AuthUser } from '../contexts/authContext';
+import { Target, Shield, Hexagon, Camera, Loader, UserPlus, UserMinus, Clock, Check, Users } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -26,14 +26,195 @@ const ROLE_DISPLAY: Record<string, string> = {
   SUPPORT: 'Trợ Thủ',
 };
 
-export const Profile: React.FC = () => {
-  const { user, token, updateUser } = useAuth();
+interface FriendshipStatus {
+  status: string | null;
+  is_friend: boolean;
+  friendship_id: string | null;
+  is_requester: boolean;
+}
+
+interface ProfileProps {
+  userId?: string; // Optional: if provided, show that user's profile
+}
+
+export const Profile: React.FC<ProfileProps> = ({ userId }) => {
+  const { user: currentUser, token, updateUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [friendCount, setFriendCount] = useState(0);
+  const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus | null>(null);
+  const [isFriendActionLoading, setIsFriendActionLoading] = useState(false);
+  const [profileUser, setProfileUser] = useState<AuthUser | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+
+  // Determine if viewing own profile or someone else's
+  const isOwnProfile = !userId || userId === currentUser?.id;
+  const displayUser = isOwnProfile ? currentUser : profileUser;
+
+  // Fetch other user's profile if needed
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isOwnProfile || !userId) return;
+      
+      setIsLoadingProfile(true);
+      try {
+        const response = await fetch(`${API_URL}/auth/users/${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setProfileUser(data.user);
+        } else {
+          console.error('Failed to fetch user profile');
+          setProfileUser(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        setProfileUser(null);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [userId, isOwnProfile]);
+
+  // Fetch friend count
+  useEffect(() => {
+    const fetchFriendCount = async () => {
+      if (!displayUser?.id) return;
+      
+      try {
+        const targetId = isOwnProfile ? '' : `/${displayUser.id}`;
+        const endpoint = isOwnProfile ? `${API_URL}/friends/count` : `${API_URL}/friends/count/${displayUser.id}`;
+        
+        const headers: Record<string, string> = {};
+        if (token && isOwnProfile) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(endpoint, { headers });
+        if (response.ok) {
+          const data = await response.json();
+          setFriendCount(data.count);
+        }
+      } catch (error) {
+        console.error('Failed to fetch friend count:', error);
+      }
+    };
+
+    fetchFriendCount();
+  }, [displayUser?.id, token, isOwnProfile]);
+
+  // Fetch friendship status with viewed user
+  useEffect(() => {
+    const fetchFriendshipStatus = async () => {
+      if (isOwnProfile || !userId || !token) return;
+      
+      try {
+        const response = await fetch(`${API_URL}/friends/status/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setFriendshipStatus(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch friendship status:', error);
+      }
+    };
+
+    fetchFriendshipStatus();
+  }, [userId, token, isOwnProfile]);
+
+  // Handle friend actions
+  const handleSendFriendRequest = async () => {
+    if (!userId || !token) return;
+    setIsFriendActionLoading(true);
+    
+    try {
+      const response = await fetch(`${API_URL}/friends/request/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        setFriendshipStatus({
+          status: 'PENDING',
+          is_friend: false,
+          friendship_id: (await response.json()).friendship_id,
+          is_requester: true,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send friend request:', error);
+    } finally {
+      setIsFriendActionLoading(false);
+    }
+  };
+
+  const handleAcceptFriendRequest = async () => {
+    if (!friendshipStatus?.friendship_id || !token) return;
+    setIsFriendActionLoading(true);
+    
+    try {
+      const response = await fetch(`${API_URL}/friends/respond/${friendshipStatus.friendship_id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accept: true }),
+      });
+      
+      if (response.ok) {
+        setFriendshipStatus({
+          ...friendshipStatus,
+          status: 'ACCEPTED',
+          is_friend: true,
+        });
+        setFriendCount(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Failed to accept friend request:', error);
+    } finally {
+      setIsFriendActionLoading(false);
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    if (!userId || !token) return;
+    setIsFriendActionLoading(true);
+    
+    try {
+      const response = await fetch(`${API_URL}/friends/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        setFriendshipStatus({
+          status: null,
+          is_friend: false,
+          friendship_id: null,
+          is_requester: false,
+        });
+        setFriendCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Failed to remove friend:', error);
+    } finally {
+      setIsFriendActionLoading(false);
+    }
+  };
 
   // Calculate chart data based on user's win rate
-  const winRate = user?.win_rate || 50;
-  const totalMatches = user?.total_matches || 0;
+  const winRate = displayUser?.win_rate || 50;
+  const totalMatches = displayUser?.total_matches || 0;
   const wins = Math.round((winRate / 100) * totalMatches);
   const losses = totalMatches - wins;
 
@@ -44,7 +225,9 @@ export const Profile: React.FC = () => {
   const COLORS = ['#f59e0b', '#334155'];
 
   const handleAvatarClick = () => {
-    fileInputRef.current?.click();
+    if (isOwnProfile) {
+      fileInputRef.current?.click();
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +279,83 @@ export const Profile: React.FC = () => {
     }
   };
 
-  if (!user) {
+  // Render friend action button
+  const renderFriendButton = () => {
+    if (isOwnProfile || !currentUser) return null;
+
+    if (isFriendActionLoading) {
+      return (
+        <button className="bg-slate-700 text-slate-400 font-bold py-2 px-8 clip-hex-button uppercase tracking-wider flex items-center gap-2" disabled>
+          <Loader className="w-4 h-4 animate-spin" />
+          Đang xử lý...
+        </button>
+      );
+    }
+
+    if (!friendshipStatus || !friendshipStatus.status) {
+      // No relationship - show Add Friend button
+      return (
+        <button 
+          onClick={handleSendFriendRequest}
+          className="bg-slate-800 hover:bg-gold-500 hover:text-slate-900 border border-gold-500 text-gold-500 font-bold py-2 px-8 clip-hex-button transition-all uppercase tracking-wider flex items-center gap-2"
+        >
+          <UserPlus className="w-4 h-4" />
+          Kết bạn
+        </button>
+      );
+    }
+
+    if (friendshipStatus.status === 'PENDING') {
+      if (friendshipStatus.is_requester) {
+        // Current user sent the request - show Pending/Cancel
+        return (
+          <button 
+            onClick={handleRemoveFriend}
+            className="bg-slate-800 hover:bg-red-600 border border-slate-600 text-slate-400 hover:text-white font-bold py-2 px-8 clip-hex-button transition-all uppercase tracking-wider flex items-center gap-2"
+          >
+            <Clock className="w-4 h-4" />
+            Đã gửi lời mời
+          </button>
+        );
+      } else {
+        // Other user sent the request - show Accept button
+        return (
+          <button 
+            onClick={handleAcceptFriendRequest}
+            className="bg-green-600 hover:bg-green-500 border border-green-400 text-white font-bold py-2 px-8 clip-hex-button transition-all uppercase tracking-wider flex items-center gap-2"
+          >
+            <Check className="w-4 h-4" />
+            Chấp nhận lời mời
+          </button>
+        );
+      }
+    }
+
+    if (friendshipStatus.status === 'ACCEPTED') {
+      // Already friends - show Unfriend button
+      return (
+        <button 
+          onClick={handleRemoveFriend}
+          className="bg-slate-800 hover:bg-red-600 border border-cyan-500 text-cyan-400 hover:text-white hover:border-red-500 font-bold py-2 px-8 clip-hex-button transition-all uppercase tracking-wider flex items-center gap-2"
+        >
+          <UserMinus className="w-4 h-4" />
+          Hủy kết bạn
+        </button>
+      );
+    }
+
+    return null;
+  };
+
+  if (isLoadingProfile) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-slate-400">Đang tải...</div>
+      </div>
+    );
+  }
+
+  if (!displayUser) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-slate-400">Đang tải...</div>
@@ -117,35 +376,39 @@ export const Profile: React.FC = () => {
 
          {/* User Info Overlay */}
          <div className="px-6 md:px-10 relative -mt-16 flex flex-col md:flex-row items-end gap-6">
-            {/* Avatar with Hexagon Frame - Clickable for upload */}
+            {/* Avatar with Hexagon Frame - Clickable for upload (only own profile) */}
             <div 
-              className="relative w-36 h-36 flex-shrink-0 mx-auto md:mx-0 cursor-pointer group/avatar"
+              className={`relative w-36 h-36 flex-shrink-0 mx-auto md:mx-0 ${isOwnProfile ? 'cursor-pointer' : ''} group/avatar`}
               onClick={handleAvatarClick}
             >
-               <input
-                 type="file"
-                 ref={fileInputRef}
-                 onChange={handleFileChange}
-                 accept="image/jpeg,image/png,image/gif,image/webp"
-                 className="hidden"
-               />
+               {isOwnProfile && (
+                 <input
+                   type="file"
+                   ref={fileInputRef}
+                   onChange={handleFileChange}
+                   accept="image/jpeg,image/png,image/gif,image/webp"
+                   className="hidden"
+                 />
+               )}
                <div className="absolute inset-0 bg-slate-900 clip-hex-button transform scale-105"></div>
                <img 
-                 src={user.avatar_url || 'https://via.placeholder.com/200?text=Avatar'} 
-                 alt={user.username} 
+                 src={displayUser.avatar_url || 'https://via.placeholder.com/200?text=Avatar'} 
+                 alt={displayUser.username} 
                  className="w-full h-full object-cover clip-hex-button border-2 border-gold-500 relative z-10"
                />
-               {/* Upload overlay */}
-               <div className="absolute inset-0 bg-black/60 clip-hex-button opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center z-20">
-                 {isUploading ? (
-                   <Loader className="w-8 h-8 text-gold-500 animate-spin" />
-                 ) : (
-                   <Camera className="w-8 h-8 text-gold-500" />
-                 )}
-               </div>
+               {/* Upload overlay - only for own profile */}
+               {isOwnProfile && (
+                 <div className="absolute inset-0 bg-black/60 clip-hex-button opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center z-20">
+                   {isUploading ? (
+                     <Loader className="w-8 h-8 text-gold-500 animate-spin" />
+                   ) : (
+                     <Camera className="w-8 h-8 text-gold-500" />
+                   )}
+                 </div>
+               )}
                <div className="absolute bottom-0 right-0 bg-slate-900 p-1 z-20">
                  <div className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider border border-red-400">
-                    LV.{user.level || 1}
+                    LV.{displayUser.level || 1}
                  </div>
                </div>
             </div>
@@ -155,11 +418,11 @@ export const Profile: React.FC = () => {
                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                   <div>
                     <h1 className="text-4xl font-display font-bold text-white tracking-tight uppercase drop-shadow-md">
-                      {user.username}
+                      {displayUser.username}
                     </h1>
                     <div className="flex items-center justify-center md:justify-start gap-3 mt-1">
                       <span className="text-slate-400 text-sm font-mono bg-slate-800 px-2 py-0.5 rounded-sm border border-slate-700">
-                        UID: {user.id.slice(0, 8)}
+                        UID: {displayUser.id.slice(0, 8)}
                       </span>
                       <span className="text-gold-400 text-sm font-bold flex items-center gap-1">
                         <Shield className="w-3 h-3" /> Server Mặt Trời
@@ -167,21 +430,26 @@ export const Profile: React.FC = () => {
                     </div>
                   </div>
                   
-                  <button className="bg-slate-800 hover:bg-gold-500 hover:text-slate-900 border border-gold-500 text-gold-500 font-bold py-2 px-8 clip-hex-button transition-all uppercase tracking-wider">
-                    Chỉnh sửa
-                  </button>
+                  {isOwnProfile ? (
+                    <button className="bg-slate-800 hover:bg-gold-500 hover:text-slate-900 border border-gold-500 text-gold-500 font-bold py-2 px-8 clip-hex-button transition-all uppercase tracking-wider">
+                      Chỉnh sửa
+                    </button>
+                  ) : (
+                    renderFriendButton()
+                  )}
                </div>
             </div>
          </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
          {[
-            { label: 'Xếp Hạng', value: user.rank ? RANK_DISPLAY[user.rank] || user.rank : 'Chưa xếp hạng', color: 'text-purple-400', sub: 'Mùa 24' },
-            { label: 'Vị Trí', value: user.main_role ? ROLE_DISPLAY[user.main_role] || user.main_role : 'Chưa chọn', color: 'text-blue-400', sub: 'Chuyên Gia' },
-            { label: 'Tỉ Lệ Thắng', value: `${user.win_rate?.toFixed(1) || 0}%`, color: 'text-green-400', sub: 'Thượng thừa' },
-            { label: 'Số Trận', value: user.total_matches?.toLocaleString() || '0', color: 'text-white', sub: 'Total Games' },
+            { label: 'Bạn Bè', value: friendCount.toString(), color: 'text-cyan-400', sub: 'Friends', icon: Users },
+            { label: 'Xếp Hạng', value: displayUser.rank ? RANK_DISPLAY[displayUser.rank] || displayUser.rank : 'Chưa xếp hạng', color: 'text-purple-400', sub: 'Mùa 24' },
+            { label: 'Vị Trí', value: displayUser.main_role ? ROLE_DISPLAY[displayUser.main_role] || displayUser.main_role : 'Chưa chọn', color: 'text-blue-400', sub: 'Chuyên Gia' },
+            { label: 'Tỉ Lệ Thắng', value: `${displayUser.win_rate?.toFixed(1) || 0}%`, color: 'text-green-400', sub: 'Thượng thừa' },
+            { label: 'Số Trận', value: displayUser.total_matches?.toLocaleString() || '0', color: 'text-white', sub: 'Total Games' },
          ].map((stat, idx) => (
            <div key={idx} className="bg-slate-900/80 p-4 border border-slate-700 clip-angled relative overflow-hidden group hover:border-gold-500/50 transition-colors">
               <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
