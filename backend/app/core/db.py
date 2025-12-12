@@ -4,7 +4,7 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.config import settings
-from app.models import Friendship, Item, User
+from app.models import Friendship, Item, Post, User
 
 # Global MongoDB client
 mongodb_client: AsyncIOMotorClient | None = None
@@ -24,7 +24,7 @@ async def connect_to_mongodb() -> None:
     # Initialize Beanie with document models
     await init_beanie(
         database=mongodb_client[settings.MONGODB_DB_NAME],
-        document_models=[User, Item, Friendship],  # Add all document models here
+        document_models=[User, Item, Friendship, Post],
     )
 
     print(f"✅ Connected to MongoDB: {settings.MONGODB_DB_NAME}")

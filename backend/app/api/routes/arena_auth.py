@@ -18,7 +18,7 @@ from app.models import (
     User,
 )
 from app.services.gemini import gemini_service
-from app.services.image_upload import upload_image_to_imgbb
+from app.services.upload import UploadServiceFactory
 from app.api.deps import CurrentUser
 
 logger = logging.getLogger(__name__)
@@ -251,10 +251,16 @@ async def upload_image(
         )
 
     try:
-        url = await upload_image_to_imgbb(content, image.filename)
+        uploader = UploadServiceFactory.get_default_image_uploader()
+        result = await uploader.upload(content, image.filename)
+        
+        if not result.success:
+            raise ValueError(result.error)
+        
         return {
             "success": True,
-            "url": url,
+            "url": result.url,
+            "provider": result.provider,
         }
     except ValueError as e:
         logger.error(f"Image upload failed: {e}")
@@ -263,6 +269,66 @@ async def upload_image(
             detail="Image upload failed. Please try again.",
         )
 
+
+@router.post("/upload-video")
+async def upload_video(
+    video: UploadFile = File(...),
+) -> dict[str, Any]:
+    """
+    Upload video to AWS S3.
+    
+    This endpoint can be used for uploading videos (posts, clips, etc.).
+    Returns the URL of the uploaded video.
+    
+    Supported formats: MP4, WebM, MOV, AVI, MKV
+    Max size: 100MB
+    """
+    # Validate file type
+    if not video.content_type:
+        raise HTTPException(
+            status_code=400, detail="File type could not be determined"
+        )
+
+    allowed_types = [
+        "video/mp4", 
+        "video/webm", 
+        "video/quicktime",  # .mov
+        "video/x-msvideo",  # .avi
+        "video/x-matroska",  # .mkv
+    ]
+    if video.content_type.lower() not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Only MP4, WebM, MOV, AVI, and MKV videos are allowed",
+        )
+
+    content = await video.read()
+    max_size = 100 * 1024 * 1024  # 100MB
+
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail="File size exceeds 100MB limit",
+        )
+
+    try:
+        uploader = UploadServiceFactory.get_default_video_uploader()
+        result = await uploader.upload(content, video.filename, video.content_type)
+        
+        if not result.success:
+            raise ValueError(result.error)
+        
+        return {
+            "success": True,
+            "url": result.url,
+            "provider": result.provider,
+        }
+    except ValueError as e:
+        logger.error(f"Video upload failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Video upload failed: {str(e)}",
+        )
 
 @router.get("/me")
 async def get_current_profile(

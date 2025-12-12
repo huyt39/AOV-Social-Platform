@@ -45,11 +45,13 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
+  // Redirect to login if not authenticated (except for public routes)
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && currentRoute === 'profile' && !profileUserId) {
+    const publicRoutes: Route[] = ['login', 'register'];
+    if (!isLoading && !isAuthenticated && !publicRoutes.includes(currentRoute)) {
       window.location.hash = 'login';
     }
-  }, [isLoading, isAuthenticated, currentRoute, profileUserId]);
+  }, [isLoading, isAuthenticated, currentRoute]);
 
   const handleTabChange = (tab: string) => {
     window.location.hash = tab;

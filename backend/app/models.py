@@ -250,3 +250,76 @@ class FriendshipStatusResponse(BaseModel):
     is_friend: bool = False
     friendship_id: Optional[str] = None
     is_requester: bool = False  # True if current user sent the request
+
+
+# ============== POST MODELS ==============
+
+class MediaType(str, Enum):
+    """Media types supported in posts."""
+    IMAGE = "image"
+    VIDEO = "video"
+
+
+class MediaItem(BaseModel):
+    """Media item embedded in a post."""
+    url: str = Field(..., max_length=1000)
+    type: MediaType
+    thumbnail_url: Optional[str] = Field(default=None, max_length=1000)
+
+
+class Post(Document):
+    """Post document for MongoDB."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    author_id: str
+    content: str = Field(..., min_length=1, max_length=5000)
+    media: list[MediaItem] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "posts"
+        use_state_management = True
+
+
+class PostCreate(BaseModel):
+    """Schema for creating a post."""
+    content: str = Field(..., min_length=1, max_length=5000)
+    media: list[MediaItem] = Field(default_factory=list)
+
+
+class PostUpdate(BaseModel):
+    """Schema for updating a post."""
+    content: Optional[str] = Field(default=None, min_length=1, max_length=5000)
+
+
+class PostAuthor(BaseModel):
+    """Author info embedded in post response."""
+    id: str
+    username: str
+    avatar_url: Optional[str] = None
+    rank: Optional[RankEnum] = None
+    level: Optional[int] = None
+
+
+class PostPublic(BaseModel):
+    """Public post response schema."""
+    id: str
+    author_id: str
+    author: PostAuthor
+    content: str
+    media: list[MediaItem]
+    created_at: datetime
+
+
+class FeedResponse(BaseModel):
+    """Feed response with cursor pagination."""
+    data: list[PostPublic]
+    next_cursor: Optional[str] = None  # ISO datetime string
+    has_more: bool = False
+
+
+class UserPostsResponse(BaseModel):
+    """Response for user's posts with cursor pagination."""
+    data: list[PostPublic]
+    next_cursor: Optional[str] = None
+    has_more: bool = False

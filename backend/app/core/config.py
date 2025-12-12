@@ -85,6 +85,12 @@ class Settings(BaseSettings):
 
     # ImgBB API Configuration
     IMGBB_API_KEY: str | None = None
+    
+    # AWS S3 Configuration (for video uploads)
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_S3_BUCKET: str | None = None
+    AWS_REGION: str = "ap-southeast-1"
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
