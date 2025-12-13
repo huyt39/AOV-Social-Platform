@@ -271,10 +271,12 @@ class Post(Document):
     """Post document for MongoDB."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     author_id: str
-    content: str = Field(..., min_length=1, max_length=5000)
+    content: str = Field(default="", max_length=5000) 
     media: list[MediaItem] = Field(default_factory=list)
     like_count: int = Field(default=0)
     comment_count: int = Field(default=0)
+    share_count: int = Field(default=0)
+    shared_post_id: Optional[str] = None  
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -297,8 +299,9 @@ class PostLike(Document):
 
 class PostCreate(BaseModel):
     """Schema for creating a post."""
-    content: str = Field(..., min_length=1, max_length=5000)
+    content: str = Field(default="", max_length=5000) 
     media: list[MediaItem] = Field(default_factory=list)
+    shared_post_id: Optional[str] = None  
 
 
 class PostUpdate(BaseModel):
@@ -315,6 +318,15 @@ class PostAuthor(BaseModel):
     level: Optional[int] = None
 
 
+class SharedPostInfo(BaseModel):
+    """Info about the original shared post."""
+    id: str
+    author: PostAuthor
+    content: str
+    media: list[MediaItem]
+    created_at: datetime
+
+
 class PostPublic(BaseModel):
     """Public post response schema."""
     id: str
@@ -324,7 +336,9 @@ class PostPublic(BaseModel):
     media: list[MediaItem]
     like_count: int = 0
     comment_count: int = 0
-    is_liked: bool = False  # Whether current user has liked this post
+    share_count: int = 0
+    is_liked: bool = False  
+    shared_post: Optional[SharedPostInfo] = None  
     created_at: datetime
 
 
@@ -350,11 +364,11 @@ class Comment(Document):
     post_id: str
     author_id: str
     content: str = Field(..., min_length=1, max_length=2000)
-    mentions: list[str] = Field(default_factory=list)  # List of mentioned user IDs
-    parent_id: Optional[str] = None  # None = root comment, có giá trị = reply
-    reply_to_user_id: Optional[str] = None  # User đang được reply (cho auto-mention)
+    mentions: list[str] = Field(default_factory=list) 
+    parent_id: Optional[str] = None 
+    reply_to_user_id: Optional[str] = None 
     like_count: int = Field(default=0)
-    reply_count: int = Field(default=0)  # Chỉ cho root comments
+    reply_count: int = Field(default=0) 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -378,9 +392,9 @@ class CommentLike(Document):
 class CommentCreate(BaseModel):
     """Schema for creating a comment."""
     content: str = Field(..., min_length=1, max_length=2000)
-    mentions: list[str] = Field(default_factory=list)  # User IDs mentioned
-    parent_id: Optional[str] = None  # None = root comment
-    reply_to_user_id: Optional[str] = None  # For auto-mention when replying
+    mentions: list[str] = Field(default_factory=list) 
+    parent_id: Optional[str] = None 
+    reply_to_user_id: Optional[str] = None 
 
 
 class CommentAuthor(BaseModel):
@@ -400,7 +414,7 @@ class CommentPublic(BaseModel):
     mentions: list[str] = Field(default_factory=list)
     parent_id: Optional[str] = None
     reply_to_user_id: Optional[str] = None
-    reply_to_username: Optional[str] = None  # Username being replied to
+    reply_to_username: Optional[str] = None 
     like_count: int = 0
     reply_count: int = 0
     is_liked: bool = False

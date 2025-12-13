@@ -3,6 +3,7 @@ import { Image, Video, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/authContext';
 import { PostDetailModal } from './PostDetailModal';
 import { PostCard, FeedPost, MediaItem } from './PostCard';
+import { SharePostModal } from './SharePostModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -30,6 +31,9 @@ export const Feed: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Share modal state
+  const [postToShare, setPostToShare] = useState<FeedPost | null>(null);
 
   // Fetch feed posts
   const fetchFeed = async (cursor?: string) => {
@@ -424,6 +428,7 @@ export const Feed: React.FC = () => {
             post={post}
             onLike={handleLike}
             onOpenComments={openPostDetail}
+            onShare={(post) => setPostToShare(post)}
           />
         ))}
       </div>
@@ -442,6 +447,20 @@ export const Feed: React.FC = () => {
           isOpen={!!selectedPost}
           onClose={closePostDetail}
           onPostUpdate={handlePostUpdate}
+        />
+      )}
+
+      {/* Share Post Modal */}
+      {postToShare && (
+        <SharePostModal
+          post={postToShare}
+          isOpen={!!postToShare}
+          onClose={() => setPostToShare(null)}
+          onShareComplete={(newPost) => {
+            setPosts(prev => [newPost, ...prev]);
+            setPostToShare(null);
+          }}
+          token={token}
         />
       )}
     </div>

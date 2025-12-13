@@ -16,6 +16,15 @@ export interface PostAuthor {
   level: number | null;
 }
 
+// Shared post info (embedded in FeedPost when it's a share)
+export interface SharedPostInfo {
+  id: string;
+  author: PostAuthor;
+  content: string;
+  media: MediaItem[];
+  created_at: string;
+}
+
 export interface FeedPost {
   id: string;
   author_id: string;
@@ -24,7 +33,9 @@ export interface FeedPost {
   media: MediaItem[];
   like_count: number;
   comment_count: number;
+  share_count: number;
   is_liked: boolean;
+  shared_post: SharedPostInfo | null;  // Original post if this is a share
   created_at: string;
 }
 
@@ -60,15 +71,19 @@ interface PostCardProps {
   post: FeedPost;
   onLike: (postId: string, isLiked: boolean) => void;
   onOpenComments: (post: FeedPost) => void;
-  showAuthor?: boolean; // Default true, can hide on profile page where author is obvious
+  onShare?: (post: FeedPost) => void;  // Share callback
+  showAuthor?: boolean;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
   post,
   onLike,
   onOpenComments,
+  onShare,
   showAuthor = true,
 }) => {
+  // Check if this is a shared post
+  const isSharedPost = !!post.shared_post;
   return (
     <div className="group relative bg-slate-900 border border-slate-800 hover:border-slate-600 transition-colors">
       {/* Decorative corner accents */}
@@ -121,16 +136,76 @@ export const PostCard: React.FC<PostCardProps> = ({
           </p>
         )}
         
-        {/* Content */}
-        <p 
-          onClick={() => onOpenComments(post)}
-          className="text-slate-200 mb-4 text-sm leading-relaxed font-light whitespace-pre-wrap border-l-2 border-slate-700 pl-3 cursor-pointer hover:text-white transition-colors"
-        >
-          {post.content}
-        </p>
+        {/* Content - Caption for shared posts, or regular content */}
+        {post.content && (
+          <p 
+            onClick={() => onOpenComments(post)}
+            className="text-slate-200 mb-4 text-sm leading-relaxed font-light whitespace-pre-wrap border-l-2 border-slate-700 pl-3 cursor-pointer hover:text-white transition-colors"
+          >
+            {post.content}
+          </p>
+        )}
+
+        {/* Shared Post Embed (for shared posts) */}
+        {isSharedPost && post.shared_post && (
+          <div className="mb-4 border border-slate-700 rounded-lg overflow-hidden bg-slate-800/50">
+            {/* Shared post author header */}
+            <div className="flex items-center gap-3 p-3 border-b border-slate-700/50">
+              <a href={`#profile/${post.shared_post.author.id}`}>
+                <img 
+                  src={post.shared_post.author.avatar_url || 'https://via.placeholder.com/40'} 
+                  alt={post.shared_post.author.username}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-600"
+                />
+              </a>
+              <div>
+                <a 
+                  href={`#profile/${post.shared_post.author.id}`}
+                  className="font-semibold text-white text-sm hover:text-gold-400 transition-colors"
+                >
+                  {post.shared_post.author.username}
+                </a>
+                <p className="text-xs text-slate-500">{formatTime(post.shared_post.created_at)}</p>
+              </div>
+            </div>
+            
+            {/* Shared post content */}
+            {post.shared_post.content && (
+              <div 
+                className="p-3 text-slate-300 text-sm cursor-pointer hover:text-white transition-colors"
+                onClick={() => onOpenComments(post)}
+              >
+                {post.shared_post.content}
+              </div>
+            )}
+            
+            {/* Shared post media */}
+            {post.shared_post.media && post.shared_post.media.length > 0 && (
+              <div className={`grid gap-1 ${post.shared_post.media.length > 1 ? 'grid-cols-2' : ''}`}>
+                {post.shared_post.media.map((item, index) => (
+                  <div key={index} className="relative">
+                    {item.type === 'image' ? (
+                      <img 
+                        src={item.url} 
+                        alt="" 
+                        className="w-full h-48 object-cover" 
+                      />
+                    ) : (
+                      <video 
+                        src={item.url} 
+                        controls 
+                        className="w-full h-48 object-cover"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         
-        {/* Media */}
-        {post.media.length > 0 && (
+        {/* Media (only for non-shared posts, or if sharer adds media) */}
+        {!isSharedPost && post.media.length > 0 && (
           <div className={`grid gap-2 mb-4 ${post.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {post.media.map((item, index) => (
               <div key={index} className="relative group-hover:brightness-110 transition-all">
@@ -173,8 +248,12 @@ export const PostCard: React.FC<PostCardProps> = ({
             <MessageCircle className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
             <span className="text-sm font-bold">{post.comment_count}</span>
           </button>
-          <button className="flex items-center gap-2 hover:text-white transition-colors ml-auto">
-            <Share2 className="w-5 h-5" />
+          <button 
+            onClick={() => onShare?.(post)}
+            className="flex items-center gap-2 hover:text-cyan-400 transition-colors ml-auto group/btn"
+          >
+            <Share2 className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
+            {post.share_count > 0 && <span className="text-sm font-bold">{post.share_count}</span>}
           </button>
         </div>
       </div>

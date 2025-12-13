@@ -19,6 +19,7 @@ from app.models import (
     PostLike,
     PostPublic,
     PostUpdate,
+    SharedPostInfo,
     User,
     UserPostsResponse,
 )
@@ -49,7 +50,7 @@ async def get_friend_ids(user_id: str) -> list[str]:
 
 
 async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = None) -> PostPublic:
-    """Add author information and like status to a post."""
+    """Add author information, like status, and shared post info to a post."""
     author = await User.find_one(User.id == post.author_id)
     
     if not author:
@@ -75,6 +76,27 @@ async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = N
         )
         is_liked = like is not None
     
+    # Fetch shared post info if this is a share
+    shared_post_info = None
+    if post.shared_post_id:
+        shared_post = await Post.find_one(Post.id == post.shared_post_id)
+        if shared_post:
+            shared_author = await User.find_one(User.id == shared_post.author_id)
+            shared_author_info = PostAuthor(
+                id=shared_post.author_id,
+                username=shared_author.username if shared_author else "[Deleted User]",
+                avatar_url=shared_author.avatar_url if shared_author else None,
+                rank=shared_author.rank if shared_author else None,
+                level=shared_author.level if shared_author else None,
+            )
+            shared_post_info = SharedPostInfo(
+                id=shared_post.id,
+                author=shared_author_info,
+                content=shared_post.content,
+                media=shared_post.media,
+                created_at=shared_post.created_at,
+            )
+    
     return PostPublic(
         id=post.id,
         author_id=post.author_id,
@@ -83,7 +105,9 @@ async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = N
         media=post.media,
         like_count=post.like_count,
         comment_count=post.comment_count,
+        share_count=post.share_count,
         is_liked=is_liked,
+        shared_post=shared_post_info,
         created_at=post.created_at,
     )
 
@@ -94,9 +118,11 @@ async def create_post(
     current_user: CurrentUser,
 ) -> dict[str, Any]:
     """
-    Create a new post.
+    Create a new post or share an existing post.
     
     Post can contain text content and optionally images/videos.
+    If shared_post_id is provided, this creates a share of that post.
+    Sharing a shared post will share the original post instead.
     """
     # Validate media count (max 10 items)
     if len(post_in.media) > 10:
@@ -105,21 +131,48 @@ async def create_post(
             detail="Maximum 10 media items per post",
         )
 
+    # Handle sharing
+    final_shared_post_id = None
+    if post_in.shared_post_id:
+        # Fetch the post being shared
+        shared_post = await Post.find_one(Post.id == post_in.shared_post_id)
+        if not shared_post:
+            raise HTTPException(
+                status_code=404,
+                detail="Post to share not found",
+            )
+        
+        # If sharing a shared post, share the original instead
+        if shared_post.shared_post_id:
+            final_shared_post_id = shared_post.shared_post_id
+            # Increment share count on the original post
+            original_post = await Post.find_one(Post.id == shared_post.shared_post_id)
+            if original_post:
+                original_post.share_count += 1
+                await original_post.save()
+        else:
+            final_shared_post_id = shared_post.id
+            # Increment share count on this post
+            shared_post.share_count += 1
+            await shared_post.save()
+
     post = Post(
         author_id=current_user.id,
         content=post_in.content,
         media=post_in.media,
+        shared_post_id=final_shared_post_id,
     )
     await post.insert()
 
-    logger.info(f"New post created by {current_user.username}: {post.id}")
+    action = "shared" if final_shared_post_id else "created"
+    logger.info(f"Post {action} by {current_user.username}: {post.id}")
 
     # Return enriched post
     post_public = await enrich_post_with_author(post, current_user.id)
 
     return {
         "success": True,
-        "message": "Đã đăng bài viết",
+        "message": "Đã chia sẻ bài viết" if final_shared_post_id else "Đã đăng bài viết",
         "data": post_public.model_dump(),
     }
 
@@ -187,6 +240,7 @@ async def get_feed(
 @router.get("/user/{user_id}")
 async def get_user_posts(
     user_id: str,
+    current_user: CurrentUser,
     cursor: Optional[str] = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> UserPostsResponse:
@@ -221,10 +275,10 @@ async def get_user_posts(
 
     next_cursor = posts[-1].created_at.isoformat() if has_more and posts else None
 
-    # Enrich with author
+    # Enrich with author - pass current_user_id for is_liked check
     enriched_posts = []
     for post in posts:
-        enriched_posts.append(await enrich_post_with_author(post))
+        enriched_posts.append(await enrich_post_with_author(post, current_user.id))
 
     return UserPostsResponse(
         data=enriched_posts,

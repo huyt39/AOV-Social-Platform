@@ -4,6 +4,7 @@ import { Target, Shield, Hexagon, Camera, Loader, UserPlus, UserMinus, Clock, Ch
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { PostCard, FeedPost } from './PostCard';
 import { PostDetailModal } from './PostDetailModal';
+import { SharePostModal } from './SharePostModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -58,6 +59,7 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
   const [postsNextCursor, setPostsNextCursor] = useState<string | null>(null);
   const [hasMorePosts, setHasMorePosts] = useState(false);
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
+  const [postToShare, setPostToShare] = useState<FeedPost | null>(null);
 
   // Determine if viewing own profile or someone else's
   const isOwnProfile = !userId || userId === currentUser?.id;
@@ -142,11 +144,15 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
   // Fetch user posts when tab changes
   useEffect(() => {
     const fetchUserPosts = async () => {
-      if (activeTab !== 'posts' || !displayUser?.id) return;
+      if (activeTab !== 'posts' || !displayUser?.id || !token) return;
       
       setIsLoadingPosts(true);
       try {
-        const response = await fetch(`${API_URL}/posts/user/${displayUser.id}?limit=10`);
+        const response = await fetch(`${API_URL}/posts/user/${displayUser.id}?limit=10`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         if (response.ok) {
           const data = await response.json();
           setUserPosts(data.data);
@@ -161,7 +167,7 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
     };
 
     fetchUserPosts();
-  }, [activeTab, displayUser?.id]);
+  }, [activeTab, displayUser?.id, token]);
 
   // Handle friend actions
   const handleSendFriendRequest = async () => {
@@ -640,6 +646,7 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
                 post={post}
                 onLike={handleLike}
                 onOpenComments={openPostDetail}
+                onShare={(post) => setPostToShare(post)}
               />
             ))
           )}
@@ -653,6 +660,20 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
           isOpen={!!selectedPost}
           onClose={closePostDetail}
           onPostUpdate={handlePostUpdate}
+        />
+      )}
+
+      {/* Share Post Modal */}
+      {postToShare && (
+        <SharePostModal
+          post={postToShare}
+          isOpen={!!postToShare}
+          onClose={() => setPostToShare(null)}
+          onShareComplete={(newPost) => {
+            setUserPosts(prev => [newPost, ...prev]);
+            setPostToShare(null);
+          }}
+          token={token}
         />
       )}
     </div>
