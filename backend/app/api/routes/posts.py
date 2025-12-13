@@ -16,6 +16,7 @@ from app.models import (
     Post,
     PostAuthor,
     PostCreate,
+    PostLike,
     PostPublic,
     PostUpdate,
     User,
@@ -47,8 +48,8 @@ async def get_friend_ids(user_id: str) -> list[str]:
     return friend_ids
 
 
-async def enrich_post_with_author(post: Post) -> PostPublic:
-    """Add author information to a post."""
+async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = None) -> PostPublic:
+    """Add author information and like status to a post."""
     author = await User.find_one(User.id == post.author_id)
     
     if not author:
@@ -65,12 +66,24 @@ async def enrich_post_with_author(post: Post) -> PostPublic:
             level=author.level,
         )
     
+    # Check if current user has liked this post
+    is_liked = False
+    if current_user_id:
+        like = await PostLike.find_one(
+            PostLike.post_id == post.id,
+            PostLike.user_id == current_user_id
+        )
+        is_liked = like is not None
+    
     return PostPublic(
         id=post.id,
         author_id=post.author_id,
         author=author_info,
         content=post.content,
         media=post.media,
+        like_count=post.like_count,
+        comment_count=post.comment_count,
+        is_liked=is_liked,
         created_at=post.created_at,
     )
 
@@ -102,7 +115,7 @@ async def create_post(
     logger.info(f"New post created by {current_user.username}: {post.id}")
 
     # Return enriched post
-    post_public = await enrich_post_with_author(post)
+    post_public = await enrich_post_with_author(post, current_user.id)
 
     return {
         "success": True,
@@ -162,7 +175,7 @@ async def get_feed(
     # Enrich posts with author info
     enriched_posts = []
     for post in posts:
-        enriched_posts.append(await enrich_post_with_author(post))
+        enriched_posts.append(await enrich_post_with_author(post, current_user.id))
 
     return FeedResponse(
         data=enriched_posts,
@@ -287,6 +300,9 @@ async def delete_post(
     if post.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Không có quyền xóa bài viết này")
 
+    # Delete all likes for this post
+    await PostLike.find(PostLike.post_id == post_id).delete()
+    
     await post.delete()
 
     logger.info(f"Post deleted: {post_id} by {current_user.username}")
@@ -294,4 +310,98 @@ async def delete_post(
     return {
         "success": True,
         "message": "Đã xóa bài viết",
+    }
+
+
+@router.post("/{post_id}/like")
+async def like_post(
+    post_id: str,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Like a post. If already liked, returns current like count.
+    """
+    post = await Post.find_one(Post.id == post_id)
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+
+    # Check if already liked
+    existing_like = await PostLike.find_one(
+        PostLike.post_id == post_id,
+        PostLike.user_id == current_user.id
+    )
+    
+    if existing_like:
+        # Already liked
+        return {
+            "success": True,
+            "message": "Đã thích bài viết",
+            "like_count": post.like_count,
+            "is_liked": True,
+        }
+
+    # Create like
+    like = PostLike(
+        post_id=post_id,
+        user_id=current_user.id,
+    )
+    await like.insert()
+
+    # Increment like count
+    post.like_count += 1
+    await post.save()
+
+    logger.info(f"Post {post_id} liked by {current_user.username}")
+
+    return {
+        "success": True,
+        "message": "Đã thích bài viết",
+        "like_count": post.like_count,
+        "is_liked": True,
+    }
+
+
+@router.delete("/{post_id}/like")
+async def unlike_post(
+    post_id: str,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Unlike a post. If not liked, returns current like count.
+    """
+    post = await Post.find_one(Post.id == post_id)
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+
+    # Check if liked
+    existing_like = await PostLike.find_one(
+        PostLike.post_id == post_id,
+        PostLike.user_id == current_user.id
+    )
+    
+    if not existing_like:
+        # Not liked
+        return {
+            "success": True,
+            "message": "Chưa thích bài viết",
+            "like_count": post.like_count,
+            "is_liked": False,
+        }
+
+    # Delete like
+    await existing_like.delete()
+
+    # Decrement like count (ensure not negative)
+    post.like_count = max(0, post.like_count - 1)
+    await post.save()
+
+    logger.info(f"Post {post_id} unliked by {current_user.username}")
+
+    return {
+        "success": True,
+        "message": "Đã bỏ thích bài viết",
+        "like_count": post.like_count,
+        "is_liked": False,
     }

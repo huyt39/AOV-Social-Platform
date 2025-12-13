@@ -1,7 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useAuth, AuthUser } from '../contexts/authContext';
-import { Target, Shield, Hexagon, Camera, Loader, UserPlus, UserMinus, Clock, Check, Users } from 'lucide-react';
+import { Target, Shield, Hexagon, Camera, Loader, UserPlus, UserMinus, Clock, Check, Users, FileText, Loader2 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PostCard, FeedPost } from './PostCard';
+import { PostDetailModal } from './PostDetailModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -46,6 +48,16 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
   const [isFriendActionLoading, setIsFriendActionLoading] = useState(false);
   const [profileUser, setProfileUser] = useState<AuthUser | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'profile' | 'posts'>('profile');
+  
+  // Posts state
+  const [userPosts, setUserPosts] = useState<FeedPost[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [postsNextCursor, setPostsNextCursor] = useState<string | null>(null);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
 
   // Determine if viewing own profile or someone else's
   const isOwnProfile = !userId || userId === currentUser?.id;
@@ -126,6 +138,30 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
 
     fetchFriendshipStatus();
   }, [userId, token, isOwnProfile]);
+
+  // Fetch user posts when tab changes
+  useEffect(() => {
+    const fetchUserPosts = async () => {
+      if (activeTab !== 'posts' || !displayUser?.id) return;
+      
+      setIsLoadingPosts(true);
+      try {
+        const response = await fetch(`${API_URL}/posts/user/${displayUser.id}?limit=10`);
+        if (response.ok) {
+          const data = await response.json();
+          setUserPosts(data.data);
+          setPostsNextCursor(data.next_cursor);
+          setHasMorePosts(data.has_more);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user posts:', error);
+      } finally {
+        setIsLoadingPosts(false);
+      }
+    };
+
+    fetchUserPosts();
+  }, [activeTab, displayUser?.id]);
 
   // Handle friend actions
   const handleSendFriendRequest = async () => {
@@ -210,6 +246,47 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
     } finally {
       setIsFriendActionLoading(false);
     }
+  };
+
+  // Handle post like
+  const handleLike = async (postId: string, isLiked: boolean) => {
+    if (!token) return;
+    
+    const method = isLiked ? 'DELETE' : 'POST';
+    try {
+      const response = await fetch(`${API_URL}/posts/${postId}/like`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserPosts(prev => prev.map(post =>
+          post.id === postId
+            ? { ...post, like_count: data.like_count, is_liked: data.is_liked }
+            : post
+        ));
+        // Update selected post if it's open
+        if (selectedPost?.id === postId) {
+          setSelectedPost(prev => prev ? { ...prev, like_count: data.like_count, is_liked: data.is_liked } : null);
+        }
+      }
+    } catch (err) {
+      console.error('Like action failed:', err);
+    }
+  };
+
+  const openPostDetail = (post: FeedPost) => {
+    setSelectedPost(post);
+  };
+
+  const closePostDetail = () => {
+    setSelectedPost(null);
+  };
+
+  const handlePostUpdate = (updatedPost: FeedPost) => {
+    setUserPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+    setSelectedPost(updatedPost);
   };
 
   // Calculate chart data based on user's win rate
@@ -462,54 +539,122 @@ export const Profile: React.FC<ProfileProps> = ({ userId }) => {
          ))}
       </div>
 
-      {/* Winrate Chart Module - Full width since we removed Tướng Tủ */}
-      <div className="bg-slate-900 border border-slate-800 clip-angled p-6 relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-50"></div>
-        <h3 className="text-lg font-display font-bold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
-          <Target className="w-5 h-5 text-gold-500" /> THỐNG KÊ MÙA GIẢI
-        </h3>
-        <div className="flex items-center gap-8">
-           <div className="h-40 w-40 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={70}
-                      stroke="none"
-                      dataKey="value"
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      {data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-bold text-white">{winRate.toFixed(0)}%</span>
-                <span className="text-[10px] text-slate-500 uppercase">Winrate</span>
-              </div>
-           </div>
-           <div className="flex-1 space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                 <span className="text-slate-400 flex items-center gap-2"><div className="w-2 h-2 bg-gold-500 rounded-sm"></div> Chiến Thắng</span>
-                 <span className="text-white font-bold font-mono">{wins}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                 <span className="text-slate-400 flex items-center gap-2"><div className="w-2 h-2 bg-slate-700 rounded-sm"></div> Thất Bại</span>
-                 <span className="text-white font-bold font-mono">{losses}</span>
-              </div>
-              <div className="h-px bg-slate-800 my-2"></div>
-              <div className="text-xs text-slate-500 text-center italic">
-                 {winRate >= 55 ? '"Phong độ đang rất cao!"' : winRate >= 50 ? '"Tiếp tục cố gắng!"' : '"Đừng bỏ cuộc, chiến binh!"'}
-              </div>
-           </div>
-        </div>
+      {/* Tabs Navigation */}
+      <div className="flex border-b border-slate-700 mb-6">
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'profile'
+              ? 'border-gold-500 text-gold-500'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Hồ sơ
+        </button>
+        <button
+          onClick={() => setActiveTab('posts')}
+          className={`flex items-center gap-2 px-6 py-3 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'posts'
+              ? 'border-gold-500 text-gold-500'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Bài viết
+        </button>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'profile' && (
+        <>
+          {/* Winrate Chart Module */}
+          <div className="bg-slate-900 border border-slate-800 clip-angled p-6 relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold-500 to-transparent opacity-50"></div>
+            <h3 className="text-lg font-display font-bold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-2">
+              <Target className="w-5 h-5 text-gold-500" /> THỐNG KÊ MÙA GIẢI
+            </h3>
+            <div className="flex items-center gap-8">
+               <div className="h-40 w-40 relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={data}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={70}
+                          stroke="none"
+                          dataKey="value"
+                          startAngle={90}
+                          endAngle={-270}
+                        >
+                          {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-white">{winRate.toFixed(0)}%</span>
+                    <span className="text-[10px] text-slate-500 uppercase">Winrate</span>
+                  </div>
+               </div>
+               <div className="flex-1 space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                     <span className="text-slate-400 flex items-center gap-2"><div className="w-2 h-2 bg-gold-500 rounded-sm"></div> Chiến Thắng</span>
+                     <span className="text-white font-bold font-mono">{wins}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                     <span className="text-slate-400 flex items-center gap-2"><div className="w-2 h-2 bg-slate-700 rounded-sm"></div> Thất Bại</span>
+                     <span className="text-white font-bold font-mono">{losses}</span>
+                  </div>
+                  <div className="h-px bg-slate-800 my-2"></div>
+                  <div className="text-xs text-slate-500 text-center italic">
+                     {winRate >= 55 ? '"Phong độ đang rất cao!"' : winRate >= 50 ? '"Tiếp tục cố gắng!"' : '"Đừng bỏ cuộc, chiến binh!"'}
+                  </div>
+               </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'posts' && (
+        <div className="space-y-4">
+          {isLoadingPosts ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-gold-500 animate-spin" />
+            </div>
+          ) : userPosts.length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg">Chưa có bài viết nào</p>
+              <p className="text-sm mt-1">
+                {isOwnProfile ? 'Hãy chia sẻ điều gì đó với cộng đồng!' : `${displayUser.username} chưa đăng bài viết nào.`}
+              </p>
+            </div>
+          ) : (
+            userPosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onLike={handleLike}
+                onOpenComments={openPostDetail}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        <PostDetailModal
+          post={selectedPost}
+          isOpen={!!selectedPost}
+          onClose={closePostDetail}
+          onPostUpdate={handlePostUpdate}
+        />
+      )}
     </div>
   );
 };

@@ -1,66 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Zap, ShieldCheck, Image, Video, X, Loader2 } from 'lucide-react';
+import { Image, Video, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/authContext';
+import { PostDetailModal } from './PostDetailModal';
+import { PostCard, FeedPost, MediaItem } from './PostCard';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-
-// Types matching backend
-interface MediaItem {
-  url: string;
-  type: 'image' | 'video';
-  thumbnail_url?: string;
-}
-
-interface PostAuthor {
-  id: string;
-  username: string;
-  avatar_url: string | null;
-  rank: string | null;
-  level: number | null;
-}
-
-interface FeedPost {
-  id: string;
-  author_id: string;
-  author: PostAuthor;
-  content: string;
-  media: MediaItem[];
-  created_at: string;
-}
 
 interface FeedResponse {
   data: FeedPost[];
   next_cursor: string | null;
   has_more: boolean;
 }
-
-// Rank display mapping
-const RANK_DISPLAY: Record<string, string> = {
-  'BRONZE': 'Đồng',
-  'SILVER': 'Bạc', 
-  'GOLD': 'Vàng',
-  'PLATINUM': 'Bạch Kim',
-  'DIAMOND': 'Kim Cương',
-  'VETERAN': 'Tinh Anh',
-  'MASTER': 'Cao Thủ',
-  'CONQUEROR': 'Thách Đấu',
-};
-
-// Format timestamp
-const formatTime = (isoString: string): string => {
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMs / 3600000);
-  const diffDay = Math.floor(diffMs / 86400000);
-
-  if (diffMin < 1) return 'Vừa xong';
-  if (diffMin < 60) return `${diffMin} phút trước`;
-  if (diffHour < 24) return `${diffHour} giờ trước`;
-  if (diffDay < 7) return `${diffDay} ngày trước`;
-  return date.toLocaleDateString('vi-VN');
-};
 
 export const Feed: React.FC = () => {
   const { user, token } = useAuth();
@@ -243,6 +193,57 @@ export const Feed: React.FC = () => {
     setIsPosting(false);
   };
 
+  // Handle like/unlike post
+  const handleLike = async (postId: string, isCurrentlyLiked: boolean) => {
+    if (!token) return;
+
+    try {
+      const method = isCurrentlyLiked ? 'DELETE' : 'POST';
+      const response = await fetch(`${API_URL}/posts/${postId}/like`, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Update post in state
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? { ...post, like_count: result.like_count, is_liked: result.is_liked }
+            : post
+        ));
+      }
+    } catch (err) {
+      console.error('Like action failed:', err);
+    }
+  };
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
+
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setNewPostContent('');
+    setMediaItems([]);
+  };
+
+  const openPostDetail = (post: FeedPost) => {
+    setSelectedPost(post);
+  };
+
+  const closePostDetail = () => {
+    setSelectedPost(null);
+  };
+
+  const handlePostUpdate = (updatedPost: FeedPost) => {
+    setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+    setSelectedPost(updatedPost);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -253,86 +254,152 @@ export const Feed: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto w-full pb-24 md:pb-8 pt-4">
-      {/* Create Post HUD */}
-      <div className="bg-slate-900/80 backdrop-blur border border-slate-700 p-1 rounded-none clip-angled mb-8 mx-4 shadow-[0_0_15px_rgba(0,0,0,0.3)]">
-        <div className="bg-slate-800/50 p-4 clip-angled border-l-2 border-gold-500">
-          <div className="flex gap-4">
-            <div className="relative">
-              <img 
-                src={user?.avatar_url || 'https://via.placeholder.com/48'} 
-                alt={user?.username} 
-                className="w-12 h-12 rounded-none clip-hex-button object-cover border border-slate-600" 
-              />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-900 transform rotate-45"></div>
-            </div>
-            <div className="flex-1">
-              <textarea
-                className="w-full bg-slate-950/50 text-white rounded-sm p-3 focus:outline-none focus:ring-1 focus:ring-gold-500/50 resize-none placeholder-slate-500 font-medium border border-slate-700/50"
-                placeholder="Chia sẻ chiến thuật, highlight hoặc tìm team..."
-                rows={2}
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                disabled={isPosting}
-              />
-              
-              {/* Media preview */}
-              {mediaItems.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {mediaItems.map((item, index) => (
-                    <div key={index} className="relative">
-                      {item.type === 'image' ? (
-                        <img src={item.url} alt="" className="w-20 h-20 object-cover rounded" />
-                      ) : (
-                        <video src={item.url} className="w-20 h-20 object-cover rounded" />
-                      )}
-                      <button
-                        onClick={() => removeMedia(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 rounded-full p-0.5"
-                      >
-                        <X className="w-4 h-4 text-white" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* Compact Create Post Trigger */}
+      <div 
+        onClick={openModal}
+        className="bg-slate-900/80 backdrop-blur border border-slate-700 p-4 mx-4 mb-8 cursor-pointer hover:border-gold-500/50 transition-all group"
+      >
+        <div className="flex items-center gap-4">
+          <img 
+            src={user?.avatar_url || 'https://via.placeholder.com/48'} 
+            alt={user?.username} 
+            className="w-12 h-12 rounded-full object-cover border-2 border-slate-600 group-hover:border-gold-500/50 transition-colors" 
+          />
+          <div className="flex-1 bg-slate-800/50 rounded-full px-4 py-3 text-slate-500 text-sm">
+            {user?.username} ơi, bạn đang nghĩ gì thế?
           </div>
-          
-          <div className="flex justify-between items-center mt-3 pl-16">
-            <div className="flex gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="flex items-center gap-1 text-slate-400 hover:text-gold-400 transition-colors text-sm"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Image className="w-4 h-4" />
-                    <Video className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+          <div className="flex gap-2">
+            <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+              <Image className="w-4 h-4 text-green-400" />
             </div>
-            <button 
-              onClick={handlePost}
-              disabled={!newPostContent.trim() || isPosting}
-              className="bg-gold-500 hover:bg-gold-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-display font-bold py-1.5 px-6 clip-hex-button transition-all hover:translate-y-[-2px] hover:shadow-[0_0_15px_rgba(245,158,11,0.4)]"
-            >
-              {isPosting ? 'ĐANG ĐĂNG...' : 'ĐĂNG BÀI'}
-            </button>
+            <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <Video className="w-4 h-4 text-purple-400" />
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Create Post Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg shadow-2xl shadow-black/50">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <div className="w-10" />
+              <h2 className="text-lg font-bold text-white">Tạo bài viết</h2>
+              <button 
+                onClick={closeModal}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {/* User Info */}
+            <div className="flex items-center gap-3 p-4 pb-2">
+              <img 
+                src={user?.avatar_url || 'https://via.placeholder.com/48'} 
+                alt={user?.username} 
+                className="w-10 h-10 rounded-full object-cover border border-slate-600" 
+              />
+              <div>
+                <p className="font-semibold text-white">{user?.username}</p>
+              </div>
+            </div>
+
+            {/* Textarea */}
+            <div className="px-4">
+              <textarea
+                className="w-full bg-transparent text-white text-lg resize-none focus:outline-none placeholder-slate-500 min-h-[120px]"
+                placeholder={`${user?.username} ơi, bạn đang nghĩ gì thế?`}
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {/* Media Preview */}
+            {mediaItems.length > 0 && (
+              <div className="px-4 pb-2">
+                <div className="border border-slate-700 rounded-lg p-2">
+                  <div className={`grid gap-2 ${mediaItems.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {mediaItems.map((item, index) => (
+                      <div key={index} className="relative">
+                        {item.type === 'image' ? (
+                          <img src={item.url} alt="" className="w-full h-32 object-cover rounded-lg" />
+                        ) : (
+                          <video src={item.url} className="w-full h-32 object-cover rounded-lg" />
+                        )}
+                        <button
+                          onClick={() => removeMedia(index)}
+                          className="absolute top-2 right-2 w-6 h-6 bg-slate-900/80 backdrop-blur rounded-full flex items-center justify-center hover:bg-slate-800"
+                        >
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add to post toolbar */}
+            <div className="mx-4 mb-4 border border-slate-700 rounded-lg p-3 flex items-center justify-between">
+              <span className="text-sm text-slate-400">Thêm vào bài viết của bạn</span>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors"
+                  title="Ảnh/Video"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-5 h-5 text-gold-500 animate-spin" />
+                  ) : (
+                    <Image className="w-5 h-5 text-green-400" />
+                  )}
+                </button>
+                <button 
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors"
+                  title="Video"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Video className="w-5 h-5 text-purple-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Post Button */}
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => {
+                  handlePost();
+                  closeModal();
+                }}
+                disabled={!newPostContent.trim() || isPosting}
+                className="w-full py-3 rounded-lg font-bold text-center transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gold-500 hover:bg-gold-400 text-slate-950"
+              >
+                {isPosting ? 'Đang đăng...' : 'Đăng'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error message */}
       {error && (
@@ -352,93 +419,12 @@ export const Feed: React.FC = () => {
       {/* Post List */}
       <div className="space-y-6 px-4">
         {posts.map((post) => (
-          <div key={post.id} className="group relative bg-slate-900 border border-slate-800 hover:border-slate-600 transition-colors">
-            {/* Decorative corner accents */}
-            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-gold-500"></div>
-            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-gold-500"></div>
-            <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-gold-500"></div>
-            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-gold-500"></div>
-
-            <div className="p-5">
-              {/* Header */}
-              <div className="flex items-start gap-4 mb-4">
-                <a 
-                  href={`#profile/${post.author.id}`}
-                  className="relative cursor-pointer group-hover:scale-105 transition-transform"
-                >
-                  <img 
-                    src={post.author.avatar_url || 'https://via.placeholder.com/48'} 
-                    alt={post.author.username} 
-                    className="w-12 h-12 object-cover clip-hex-button border-2 border-slate-700" 
-                  />
-                  {post.author.rank && (
-                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-slate-950 text-[10px] font-bold px-2 py-0.5 border border-slate-700 text-gold-500 whitespace-nowrap">
-                      {RANK_DISPLAY[post.author.rank] || post.author.rank}
-                    </div>
-                  )}
-                </a>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-display font-bold text-lg text-white tracking-wide flex items-center gap-2">
-                        <a href={`#profile/${post.author.id}`} className="hover:text-gold-400 transition-colors">
-                          {post.author.username}
-                        </a>
-                        {post.author.level && post.author.level >= 30 && <Zap className="w-4 h-4 text-gold-400 fill-gold-400" />}
-                      </h3>
-                      <p className="text-slate-500 text-xs font-mono uppercase tracking-wider">
-                        {formatTime(post.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Content */}
-              <p className="text-slate-200 mb-4 text-sm leading-relaxed font-light whitespace-pre-wrap border-l-2 border-slate-700 pl-3">
-                {post.content}
-              </p>
-              
-              {/* Media */}
-              {post.media.length > 0 && (
-                <div className={`grid gap-2 mb-4 ${post.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  {post.media.map((item, index) => (
-                    <div key={index} className="relative group-hover:brightness-110 transition-all">
-                      <div className="absolute inset-0 border border-white/10 pointer-events-none z-10"></div>
-                      {item.type === 'image' ? (
-                        <img 
-                          src={item.url} 
-                          alt="Post content" 
-                          className="w-full h-64 object-cover clip-angled" 
-                        />
-                      ) : (
-                        <video 
-                          src={item.url} 
-                          controls 
-                          className="w-full h-64 object-cover clip-angled"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center gap-6 text-slate-400 border-t border-slate-800 pt-3 mt-2">
-                <button className="flex items-center gap-2 hover:text-gold-400 transition-colors group/btn">
-                  <Heart className="w-5 h-5 group-hover/btn:fill-gold-400 group-hover/btn:scale-110 transition-transform" />
-                  <span className="text-sm font-bold">0</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-blue-400 transition-colors group/btn">
-                  <MessageCircle className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                  <span className="text-sm font-bold">0</span>
-                </button>
-                <button className="flex items-center gap-2 hover:text-white transition-colors ml-auto">
-                  <Share2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <PostCard
+            key={post.id}
+            post={post}
+            onLike={handleLike}
+            onOpenComments={openPostDetail}
+          />
         ))}
       </div>
 
@@ -448,6 +434,16 @@ export const Feed: React.FC = () => {
           <Loader2 className="w-6 h-6 text-gold-500 animate-spin" />
         )}
       </div>
+
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        <PostDetailModal
+          post={selectedPost}
+          isOpen={!!selectedPost}
+          onClose={closePostDetail}
+          onPostUpdate={handlePostUpdate}
+        />
+      )}
     </div>
   );
 };
