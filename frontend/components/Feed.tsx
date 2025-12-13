@@ -395,10 +395,10 @@ export const Feed: React.FC = () => {
                   handlePost();
                   closeModal();
                 }}
-                disabled={!newPostContent.trim() || isPosting}
+                disabled={!newPostContent.trim() || isPosting || isUploading}
                 className="w-full py-3 rounded-lg font-bold text-center transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gold-500 hover:bg-gold-400 text-slate-950"
               >
-                {isPosting ? 'Đang đăng...' : 'Đăng'}
+                {isUploading ? 'Đang tải lên...' : isPosting ? 'Đang đăng...' : 'Đăng'}
               </button>
             </div>
           </div>
