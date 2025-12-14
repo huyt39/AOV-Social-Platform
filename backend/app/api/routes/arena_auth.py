@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -151,7 +151,7 @@ async def register_arena_user(
         credibility_score=user_in.credibility_score,
         profile_screenshot_url=user_in.profile_screenshot_url,
         profile_verified=True,
-        profile_verified_at=datetime.now(UTC),
+        profile_verified_at=datetime.now(timezone.utc),
     )
 
     await user.insert()
@@ -273,64 +273,19 @@ async def upload_image(
 
 
 @router.post("/upload-video")
-async def upload_video(
-    video: UploadFile = File(...),
-) -> dict[str, Any]:
+async def upload_video_deprecated() -> dict[str, Any]:
     """
-    Upload video to AWS S3.
+    DEPRECATED: Use /videos/upload-request for pre-signed URL upload.
     
-    This endpoint can be used for uploading videos (posts, clips, etc.).
-    Returns the URL of the uploaded video.
-    
-    Supported formats: MP4, WebM, MOV, AVI, MKV
-    Max size: 100MB
+    The new flow is:
+    1. POST /videos/upload-request -> get pre-signed URL
+    2. PUT to pre-signed URL -> upload directly to S3
+    3. POST /videos/{video_id}/complete -> trigger processing
     """
-    # Validate file type
-    if not video.content_type:
-        raise HTTPException(
-            status_code=400, detail="File type could not be determined"
-        )
-
-    allowed_types = [
-        "video/mp4", 
-        "video/webm", 
-        "video/quicktime",  # .mov
-        "video/x-msvideo",  # .avi
-        "video/x-matroska",  # .mkv
-    ]
-    if video.content_type.lower() not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail="Only MP4, WebM, MOV, AVI, and MKV videos are allowed",
-        )
-
-    content = await video.read()
-    max_size = 100 * 1024 * 1024  # 100MB
-
-    if len(content) > max_size:
-        raise HTTPException(
-            status_code=400,
-            detail="File size exceeds 100MB limit",
-        )
-
-    try:
-        uploader = UploadServiceFactory.get_default_video_uploader()
-        result = await uploader.upload(content, video.filename, video.content_type)
-        
-        if not result.success:
-            raise ValueError(result.error)
-        
-        return {
-            "success": True,
-            "url": result.url,
-            "provider": result.provider,
-        }
-    except ValueError as e:
-        logger.error(f"Video upload failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Video upload failed: {str(e)}",
-        )
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /videos/upload-request for video uploads with pre-signed URLs."
+    )
 
 @router.get("/me")
 async def get_current_profile(

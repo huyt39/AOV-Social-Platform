@@ -1,5 +1,6 @@
 import React from 'react';
 import { Heart, MessageCircle, Share2, Zap } from 'lucide-react';
+import { VideoPlayer } from './VideoPlayer';
 
 // Types matching backend
 export interface MediaItem {
@@ -191,10 +192,10 @@ export const PostCard: React.FC<PostCardProps> = ({
                         className="w-full h-48 object-cover" 
                       />
                     ) : (
-                      <video 
+                      <VideoPlayer 
                         src={item.url} 
-                        controls 
-                        className="w-full h-48 object-cover"
+                        poster={item.thumbnail_url}
+                        className="w-full h-48"
                       />
                     )}
                   </div>
@@ -217,10 +218,10 @@ export const PostCard: React.FC<PostCardProps> = ({
                     className="w-full h-64 object-cover clip-angled" 
                   />
                 ) : (
-                  <video 
+                  <VideoPlayer 
                     src={item.url} 
-                    controls 
-                    className="w-full h-64 object-cover clip-angled"
+                    poster={item.thumbnail_url}
+                    className="w-full h-64 clip-angled"
                   />
                 )}
               </div>

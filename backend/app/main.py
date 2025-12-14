@@ -19,6 +19,15 @@ async def lifespan(app: FastAPI):
     """Handle startup and shutdown events."""
     # Startup
     await connect_to_mongodb()
+    
+    # Ensure S3 buckets exist
+    try:
+        from app.services.clawcloud_s3 import clawcloud_s3
+        await clawcloud_s3.ensure_buckets_exist()
+        print("✅ S3 buckets checked/created")
+    except Exception as e:
+        print(f"⚠️ S3 bucket setup skipped: {e}")
+    
     yield
     # Shutdown
     await close_mongodb_connection()
@@ -35,13 +44,18 @@ app = FastAPI(
 )
 
 # Set all CORS enabled origins
-if settings.all_cors_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.all_cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+cors_origins = settings.all_cors_origins or [
+    "http://localhost:5173",
+    "http://localhost:3000", 
+    "http://localhost",
+    "http://localhost:8000",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

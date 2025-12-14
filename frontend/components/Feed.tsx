@@ -119,7 +119,7 @@ export const Feed: React.FC = () => {
     };
   }, [hasMore, isLoadingMore, loadMore]);
 
-  // Handle file upload
+  // Handle file upload - uses pre-signed URLs for videos
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !token) return;
@@ -128,26 +128,112 @@ export const Feed: React.FC = () => {
 
     for (const file of Array.from(files)) {
       const isVideo = file.type.startsWith('video/');
-      const endpoint = isVideo ? '/auth/upload-video' : '/auth/upload-image';
       
-      const formData = new FormData();
-      formData.append(isVideo ? 'video' : 'image', file);
-
       try {
-        const response = await fetch(`${API_URL}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        });
+        if (isVideo) {
+          // New video upload flow: pre-signed URL -> direct S3 upload -> complete
+          console.log('🎬 [Video Upload] Starting upload for:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+          
+          // Step 1: Request pre-signed URL
+          console.log('📝 [Step 1] Requesting pre-signed URL...');
+          const requestResponse = await fetch(`${API_URL}/videos/upload-request`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              content_type: file.type,
+            }),
+          });
 
-        if (response.ok) {
-          const result = await response.json();
-          setMediaItems(prev => [...prev, {
-            url: result.url,
-            type: isVideo ? 'video' : 'image',
-          }]);
+          if (!requestResponse.ok) {
+            const errorText = await requestResponse.text();
+            console.error('❌ [Step 1] Failed to get upload URL:', requestResponse.status, errorText);
+            continue;
+          }
+
+          const { video_id, upload_url, s3_key } = await requestResponse.json();
+          console.log('✅ [Step 1] Got pre-signed URL:', { video_id, s3_key });
+          console.log('🔗 [Step 1] Upload URL:', upload_url.substring(0, 100) + '...');
+
+          // Step 2: Upload directly to S3 using pre-signed URL
+          console.log('☁️ [Step 2] Uploading to S3...');
+          const uploadStartTime = Date.now();
+          const uploadResponse = await fetch(upload_url, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': file.type,
+            },
+            body: file,
+          });
+
+          const uploadDuration = Date.now() - uploadStartTime;
+          
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            console.error('❌ [Step 2] Failed to upload to S3:', uploadResponse.status, errorText);
+            continue;
+          }
+          console.log('✅ [Step 2] S3 upload successful! Duration:', uploadDuration, 'ms');
+
+          // Step 3: Mark upload complete to trigger processing
+          console.log('🚀 [Step 3] Marking upload complete & triggering processing...');
+          const completeResponse = await fetch(`${API_URL}/videos/${video_id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (completeResponse.ok) {
+            const completeData = await completeResponse.json();
+            console.log('✅ [Step 3] Upload marked complete:', completeData);
+            console.log('📨 [Step 3] Job pushed to RabbitMQ for processing');
+            
+            // Get video info for thumbnail/play URL
+            console.log('📊 [Step 4] Fetching video info...');
+            const videoInfo = await fetch(`${API_URL}/videos/${video_id}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const videoData = await videoInfo.json();
+            console.log('✅ [Step 4] Video info:', videoData);
+
+            const videoUrl = videoData.play_url || upload_url.split('?')[0];
+            console.log('🎥 [Final] Video URL to use:', videoUrl);
+            
+            setMediaItems(prev => [...prev, {
+              url: videoUrl,
+              type: 'video',
+              thumbnail_url: videoData.thumbnail_url,
+            }]);
+            
+            console.log('🎉 [Complete] Video upload flow finished successfully!');
+          } else {
+            const errorText = await completeResponse.text();
+            console.error('❌ [Step 3] Failed to complete:', completeResponse.status, errorText);
+          }
+        } else {
+          // Image upload - use existing endpoint
+          const formData = new FormData();
+          formData.append('image', file);
+
+          const response = await fetch(`${API_URL}/auth/upload-image`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            setMediaItems(prev => [...prev, {
+              url: result.url,
+              type: 'image',
+            }]);
+          }
         }
       } catch (err) {
         console.error('Upload failed:', err);

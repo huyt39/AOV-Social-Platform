@@ -1,7 +1,7 @@
 """Forum API routes for categories, threads, and comments."""
 
 import logging
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -348,7 +348,7 @@ async def update_thread(
     if thread_in.media_urls is not None:
         thread.media_urls = thread_in.media_urls
     
-    thread.updated_at = datetime.now(UTC)
+    thread.updated_at = datetime.now(timezone.utc)
     await thread.save()
     
     return await build_thread_public(thread, current_user.id)
@@ -509,7 +509,7 @@ async def create_comment(
     
     # Update thread stats
     thread.comment_count += 1
-    thread.last_activity_at = datetime.now(UTC)
+    thread.last_activity_at = datetime.now(timezone.utc)
     await thread.save()
     
     return await build_comment_public(comment, current_user.id)
@@ -553,7 +553,7 @@ async def reply_to_comment(
     
     # Update thread stats
     thread.comment_count += 1
-    thread.last_activity_at = datetime.now(UTC)
+    thread.last_activity_at = datetime.now(timezone.utc)
     await thread.save()
     
     return await build_comment_public(reply, current_user.id)

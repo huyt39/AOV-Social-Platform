@@ -127,6 +127,17 @@ from .forum import (
     AdminStats,
 )
 
+# Video models
+from .video import (
+    VideoStatus,
+    Video,
+    VideoUploadRequest,
+    VideoUploadResponse,
+    VideoCompleteRequest,
+    VideoProcessedRequest,
+    VideoPublic,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base
@@ -216,4 +227,12 @@ __all__ = [
     "ReportsResponse",
     "ReportResolve",
     "AdminStats",
+    # Video
+    "VideoStatus",
+    "Video",
+    "VideoUploadRequest",
+    "VideoUploadResponse",
+    "VideoCompleteRequest",
+    "VideoProcessedRequest",
+    "VideoPublic",
 ]

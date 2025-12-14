@@ -86,7 +86,24 @@ class Settings(BaseSettings):
     # ImgBB API Configuration
     IMGBB_API_KEY: str | None = None
     
-    # AWS S3 Configuration (for video uploads)
+    # ClawCloud S3 Configuration (S3-compatible object storage for videos)
+    S3_ACCESS_KEY: str | None = None
+    S3_SECRET_KEY: str | None = None
+    S3_REGION: str = "ap-southeast-1"
+    S3_FORCE_PATH_STYLE: bool = True
+    S3_USE_SSL: bool = True
+    S3_INTERNAL_ENDPOINT: str = "http://object-storage.objectstorage-system.svc.cluster.local"
+    S3_EXTERNAL_ENDPOINT: str = "https://objectstorageapi.ap-southeast-1.clawcloudrun.com"
+    S3_RAW_BUCKET: str = "xfwyb01b-raw-videos"
+    S3_PROCESSED_BUCKET: str = "xfwyb01b-processed-videos"
+    
+    # RabbitMQ Configuration
+    RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/"
+    
+    # CDN Configuration (initially same as S3 external endpoint)
+    CDN_BASE_URL: str = "https://objectstorageapi.ap-southeast-1.clawcloudrun.com"
+    
+    # Legacy AWS S3 Configuration (kept for backward compatibility)
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
     AWS_S3_BUCKET: str | None = None

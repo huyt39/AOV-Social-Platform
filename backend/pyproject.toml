@@ -28,6 +28,7 @@ dependencies = [
     "pillow>=12.0.0",
     "trustcall>=0.0.26",
     "aioboto3",
+    "aio-pika>=9.4.0",
 ]
 
 [tool.uv]
