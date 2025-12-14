@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Heart, MessageCircle, Share2, CornerUpLeft, Eye, Image, X, Loader2 } from 'lucide-react';
-import { 
-  ForumThread, ForumComment, ForumCommentsResponse, 
-  ThreadStatus, ForumCommentStatus, CreateCommentInput 
+import {
+  ForumThread, ForumComment, ForumCommentsResponse,
+  ThreadStatus, ForumCommentStatus, CreateCommentInput
 } from '../types';
 import { API_BASE_URL } from '../constants';
 import { useAuth } from '../contexts/authContext';
@@ -22,20 +22,20 @@ const CommentItem: React.FC<{
 
   // Handle snake_case from API
   const createdAt = comment.createdAt || (comment as any).created_at;
-  
+
   const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('vi-VN', { 
-      day: 'numeric', 
-      month: 'short', 
+    return date.toLocaleDateString('vi-VN', {
+      day: 'numeric',
+      month: 'short',
       year: 'numeric'
     });
   };
 
-  const isHidden = comment.status === ForumCommentStatus.HIDDEN || 
-                   comment.status === ForumCommentStatus.DELETED;
+  const isHidden = comment.status === ForumCommentStatus.HIDDEN ||
+    comment.status === ForumCommentStatus.DELETED;
 
   const mediaUrls = comment.mediaUrls || (comment as any).media_urls || [];
   const quotedContent = (comment as any).quotedContent || (comment as any).quoted_content || null;
@@ -49,14 +49,18 @@ const CommentItem: React.FC<{
         <div className="w-32 md:w-40 flex-shrink-0 bg-slate-800/60 p-4 border-r border-slate-700/50">
           <div className="flex flex-col items-center text-center">
             <img
-              src={comment.author.avatarUrl || (comment.author as any).avatar_url || 
-                   `https://ui-avatars.com/api/?name=${comment.author.username}&background=3b82f6&color=fff&size=96`}
+              src={comment.author.avatarUrl || (comment.author as any).avatar_url ||
+                `https://ui-avatars.com/api/?name=${comment.author.username}&background=3b82f6&color=fff&size=96`}
               alt={comment.author.username}
-              className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-slate-600 mb-3"
+              className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-slate-600 mb-3 cursor-pointer hover:border-blue-400 transition-colors"
+              onClick={() => window.location.hash = `profile/${comment.author.id}`}
             />
-            <a className="font-semibold text-blue-400 hover:underline text-sm md:text-base cursor-pointer">
+            <button
+              onClick={() => window.location.hash = `profile/${comment.author.id}`}
+              className="font-semibold text-blue-400 hover:underline text-sm md:text-base cursor-pointer"
+            >
               {comment.author.username}
-            </a>
+            </button>
             {comment.author.rank && (
               <span className="text-xs text-slate-400 mt-1 px-2 py-0.5 bg-slate-700/50 rounded">
                 {comment.author.rank}
@@ -65,7 +69,7 @@ const CommentItem: React.FC<{
             <span className="text-[11px] text-slate-500 mt-2">Member</span>
           </div>
         </div>
-        
+
         {/* Right column - Content */}
         <div className="flex-1 flex flex-col">
           {/* Header bar */}
@@ -80,7 +84,7 @@ const CommentItem: React.FC<{
               )}
             </div>
           </div>
-          
+
           {/* Content area */}
           <div className="flex-1 p-4">
             {/* Quote box for replies */}
@@ -96,12 +100,12 @@ const CommentItem: React.FC<{
                 )}
               </div>
             )}
-            
+
             {/* Content */}
             <div className="text-slate-200 text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words">
               {comment.content}
             </div>
-            
+
             {/* Media */}
             {mediaUrls.length > 0 && !isHidden && (
               <div className="flex flex-wrap gap-3 mt-4">
@@ -116,7 +120,7 @@ const CommentItem: React.FC<{
               </div>
             )}
           </div>
-          
+
           {/* Footer actions */}
           <div className="flex items-center justify-between px-4 py-2 bg-slate-700/20 border-t border-slate-700/50">
             <div className="flex items-center gap-1">
@@ -135,7 +139,7 @@ const CommentItem: React.FC<{
                 <span className="text-xs text-slate-500 font-bold">{comment.likeCount}</span>
               )}
             </div>
-            
+
             {isAuthenticated && comment.status === ForumCommentStatus.ACTIVE && (
               <button
                 onClick={() => onReply(comment.id, comment.author.username)}
@@ -162,26 +166,26 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  
+
   // Comment form
   const [commentContent, setCommentContent] = useState('');
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Media upload for comments
   const [commentMediaUrls, setCommentMediaUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !token) return;
-    
+
     setIsUploading(true);
     for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append('image', file);
-      
+
       try {
         const response = await fetch(`${API_BASE_URL}/auth/upload-image`, {
           method: 'POST',
@@ -199,7 +203,7 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
     setIsUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
-  
+
   const removeMedia = (index: number) => {
     setCommentMediaUrls(prev => prev.filter((_, i) => i !== index));
   };
@@ -208,10 +212,10 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
     try {
       const headers: HeadersInit = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      
+
       const response = await fetch(`${API_BASE_URL}/forum/threads/${threadId}`, { headers });
       if (!response.ok) throw new Error('Thread not found');
-      
+
       const data = await response.json();
       // Normalize snake_case to camelCase
       setThread({
@@ -240,21 +244,21 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
   const fetchComments = useCallback(async (cursor?: string) => {
     try {
       if (!cursor) setLoadingComments(true);
-      
+
       const params = new URLSearchParams({ limit: '20' });
       if (cursor) params.append('cursor', cursor);
-      
+
       const headers: HeadersInit = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      
+
       const response = await fetch(
         `${API_BASE_URL}/forum/threads/${threadId}/comments?${params}`,
         { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch comments');
-      
+
       const data: ForumCommentsResponse = await response.json();
-      
+
       if (cursor) {
         setComments(prev => [...prev, ...data.data]);
       } else {
@@ -281,15 +285,15 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
 
   const handleLikeThread = async () => {
     if (!isAuthenticated || !thread) return;
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/forum/threads/${threadId}/like`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      
+
       if (!response.ok) throw new Error('Failed to like');
-      
+
       const data = await response.json();
       setThread({
         ...thread,
@@ -303,17 +307,17 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
 
   const handleLikeComment = async (commentId: string) => {
     if (!isAuthenticated) return;
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/forum/comments/${commentId}/like`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       });
-      
+
       if (!response.ok) throw new Error('Failed to like comment');
-      
+
       const data = await response.json();
-      
+
       // Update comment in state
       const updateComment = (comments: ForumComment[]): ForumComment[] => {
         return comments.map(c => {
@@ -326,7 +330,7 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
           return c;
         });
       };
-      
+
       setComments(updateComment(comments));
     } catch (err) {
       console.error('Error liking comment:', err);
@@ -336,12 +340,12 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentContent.trim()) return;
-    
+
     try {
       setSubmitting(true);
-      
+
       let response: Response;
-      
+
       if (replyingTo) {
         // Reply to comment
         response = await fetch(`${API_BASE_URL}/forum/comments/${replyingTo.id}/reply`, {
@@ -363,19 +367,19 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
           body: JSON.stringify({ content: commentContent, media_urls: commentMediaUrls }),
         });
       }
-      
+
       if (!response.ok) throw new Error('Failed to post comment');
-      
+
       const newComment: ForumComment = await response.json();
-      
+
       // All comments are flat now - just append to end of list
       setComments(prev => [...prev, newComment]);
-      
+
       // Update thread comment count
       if (thread) {
         setThread({ ...thread, commentCount: thread.commentCount + 1 });
       }
-      
+
       setCommentContent('');
       setCommentMediaUrls([]);
       setReplyingTo(null);
@@ -439,11 +443,17 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
           <img
             src={thread.author.avatarUrl || `https://ui-avatars.com/api/?name=${thread.author.username}&background=random`}
             alt={thread.author.username}
-            className="w-12 h-12 rounded-full object-cover"
+            className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => window.location.hash = `profile/${thread.authorId}`}
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-amber-400">@{thread.author.username}</span>
+              <span
+                className="font-semibold text-amber-400 cursor-pointer hover:underline"
+                onClick={() => window.location.hash = `profile/${thread.authorId}`}
+              >
+                @{thread.author.username}
+              </span>
               {thread.author.rank && (
                 <span className="text-xs px-2 py-0.5 bg-slate-700 text-slate-300 rounded">
                   {thread.author.rank}
@@ -489,21 +499,21 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
             onClick={handleLikeThread}
             disabled={!isAuthenticated}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors group/btn
-                       ${thread.isLiked 
-                         ? 'bg-gold-500/20 text-gold-400' 
-                         : 'bg-slate-700/50 text-slate-400 hover:bg-gold-500/20 hover:text-gold-400'}
+                       ${thread.isLiked
+                ? 'bg-gold-500/20 text-gold-400'
+                : 'bg-slate-700/50 text-slate-400 hover:bg-gold-500/20 hover:text-gold-400'}
                        disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Heart className={`w-5 h-5 group-hover/btn:scale-110 transition-transform ${thread.isLiked ? 'fill-gold-400' : ''}`} />
             <span className="font-bold">{thread.likeCount}</span>
           </button>
-          
+
           <div className="flex items-center gap-2 text-blue-400/70 hover:text-blue-400 transition-colors">
             <MessageCircle className="w-5 h-5" />
             <span className="font-bold">{thread.commentCount}</span>
             <span className="text-slate-500">bình luận</span>
           </div>
-          
+
           <div className="flex items-center gap-2 text-slate-400 hover:text-slate-300 transition-colors">
             <Eye className="w-5 h-5" />
             <span className="font-bold">{thread.viewCount}</span>
@@ -585,7 +595,7 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
                 </button>
               </div>
             )}
-            
+
             {/* Media preview */}
             {commentMediaUrls.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-2">
@@ -603,7 +613,7 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
                 ))}
               </div>
             )}
-            
+
             <div className="flex gap-3">
               {/* Hidden file input */}
               <input
@@ -614,7 +624,7 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              
+
               {/* Upload button */}
               <button
                 type="button"
@@ -631,7 +641,7 @@ export const ForumThreadPage: React.FC<ForumThreadPageProps> = ({ threadId }) =>
                   <Image className="w-5 h-5 text-green-400" />
                 )}
               </button>
-              
+
               <input
                 type="text"
                 value={commentContent}

@@ -18,27 +18,27 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [sortBy, setSortBy] = useState<'latest' | 'activity' | 'popular'>('latest');
-  
+
   // New thread modal
   const [showNewThread, setShowNewThread] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Media upload for new thread
   const [threadMediaUrls, setThreadMediaUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !token) return;
-    
+
     setIsUploading(true);
     for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append('image', file);
-      
+
       try {
         const response = await fetch(`${API_BASE_URL}/auth/upload-image`, {
           method: 'POST',
@@ -56,7 +56,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
     setIsUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
-  
+
   const removeMedia = (index: number) => {
     setThreadMediaUrls(prev => prev.filter((_, i) => i !== index));
   };
@@ -88,9 +88,9 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
         { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch threads');
-      
+
       const data: ForumThreadsResponse = await response.json();
-      
+
       // Normalize snake_case to camelCase from API
       const normalizedThreads = data.data.map((thread: any) => ({
         ...thread,
@@ -106,7 +106,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
           avatarUrl: thread.author.avatarUrl || thread.author.avatar_url,
         } : thread.author,
       }));
-      
+
       if (cursor) {
         setThreads(prev => [...prev, ...normalizedThreads]);
       } else {
@@ -154,13 +154,13 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
       );
 
       if (!response.ok) throw new Error('Failed to create thread');
-      
+
       const thread = await response.json();
       setShowNewThread(false);
       setNewTitle('');
       setNewContent('');
       setThreadMediaUrls([]);
-      
+
       // Navigate to new thread
       window.location.hash = `forum/thread/${thread.id}`;
     } catch (err) {
@@ -174,7 +174,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
     if (!dateStr) return '';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return '';
-    
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -218,7 +218,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
           </svg>
           Quay lại
         </button>
-        
+
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-amber-400">
@@ -228,7 +228,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
               <p className="text-slate-400 mt-1">{category.description}</p>
             )}
           </div>
-          
+
           {isAuthenticated && (
             <button
               onClick={() => setShowNewThread(true)}
@@ -256,9 +256,9 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
             key={tab.key}
             onClick={() => setSortBy(tab.key as typeof sortBy)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
-                       ${sortBy === tab.key 
-                         ? 'bg-amber-500/20 text-amber-400' 
-                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                       ${sortBy === tab.key
+                ? 'bg-amber-500/20 text-amber-400'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
           >
             {tab.label}
           </button>
@@ -295,7 +295,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                   alt={thread.author.username}
                   className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                 />
-                
+
                 <div className="flex-1 min-w-0">
                   {/* Title */}
                   <div className="flex items-center gap-2">
@@ -309,15 +309,23 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Preview */}
                   <p className="text-sm text-slate-400 line-clamp-1 mt-0.5">
                     {thread.contentPreview}
                   </p>
-                  
+
                   {/* Meta */}
                   <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                    <span className="text-amber-400/70">@{thread.author.username}</span>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.hash = `profile/${thread.author.id}`;
+                      }}
+                      className="text-amber-400/70 hover:text-amber-300 hover:underline cursor-pointer"
+                    >
+                      @{thread.author.username}
+                    </span>
                     <span>•</span>
                     <span>{formatDate(thread.createdAt)}</span>
                     <span className="flex items-center gap-1 text-slate-400">
@@ -369,7 +377,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                 </svg>
               </button>
             </div>
-            
+
             <form onSubmit={handleCreateThread} className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">
@@ -386,7 +394,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">
                   Nội dung
@@ -402,13 +410,13 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                   required
                 />
               </div>
-              
+
               {/* Media upload section */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Hình ảnh
                 </label>
-                
+
                 {/* Media preview */}
                 {threadMediaUrls.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
@@ -426,7 +434,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                     ))}
                   </div>
                 )}
-                
+
                 {/* Hidden file input */}
                 <input
                   ref={fileInputRef}
@@ -436,7 +444,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                
+
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -453,7 +461,7 @@ export const ForumCategoryPage: React.FC<ForumCategoryPageProps> = ({ categoryId
                   <span className="text-slate-300 text-sm">Thêm ảnh</span>
                 </button>
               </div>
-              
+
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
