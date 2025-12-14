@@ -9,13 +9,19 @@ import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
 import { Register } from './components/Register';
 import { Login } from './components/Login';
+import { Forum } from './components/Forum';
+import { ForumCategoryPage } from './components/ForumCategory';
+import { ForumThreadPage } from './components/ForumThread';
+import { AdminDashboard } from './components/AdminDashboard';
 import { AuthProvider, useAuth } from './contexts/authContext';
 
-type Route = 'feed' | 'lfg' | 'friends' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login';
+type Route = 'feed' | 'lfg' | 'friends' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin';
 
 const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('feed');
   const [profileUserId, setProfileUserId] = useState<string | undefined>(undefined);
+  const [forumCategoryId, setForumCategoryId] = useState<string | undefined>(undefined);
+  const [forumThreadId, setForumThreadId] = useState<string | undefined>(undefined);
   const { isLoading, isAuthenticated } = useAuth();
 
   // Simple hash-based routing
@@ -28,8 +34,23 @@ const AppContent: React.FC = () => {
         const userId = hash.split('/')[1];
         setProfileUserId(userId);
         setCurrentRoute('profile');
-      } else {
+      }
+      // Check for forum/category/:categoryId pattern
+      else if (hash.startsWith('forum/category/')) {
+        const categoryId = hash.split('/')[2];
+        setForumCategoryId(categoryId);
+        setCurrentRoute('forum-category');
+      }
+      // Check for forum/thread/:threadId pattern
+      else if (hash.startsWith('forum/thread/')) {
+        const threadId = hash.split('/')[2];
+        setForumThreadId(threadId);
+        setCurrentRoute('forum-thread');
+      }
+      else {
         setProfileUserId(undefined);
+        setForumCategoryId(undefined);
+        setForumThreadId(undefined);
         setCurrentRoute(hash as Route);
       }
     };
@@ -47,7 +68,7 @@ const AppContent: React.FC = () => {
 
   // Redirect to login if not authenticated (except for public routes)
   useEffect(() => {
-    const publicRoutes: Route[] = ['login', 'register'];
+    const publicRoutes: Route[] = ['login', 'register', 'forum', 'forum-category', 'forum-thread'];
     if (!isLoading && !isAuthenticated && !publicRoutes.includes(currentRoute)) {
       window.location.hash = 'login';
     }
@@ -76,6 +97,10 @@ const AppContent: React.FC = () => {
       case 'coach': return <AICoach />;
       case 'profile': return <Profile userId={profileUserId} />;
       case 'settings': return <Settings />;
+      case 'forum': return <Forum />;
+      case 'forum-category': return <ForumCategoryPage categoryId={forumCategoryId || ''} />;
+      case 'forum-thread': return <ForumThreadPage threadId={forumThreadId || ''} />;
+      case 'admin': return <AdminDashboard />;
       default: return <Feed />;
     }
   };

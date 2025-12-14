@@ -13,6 +13,8 @@ export interface AuthUser {
   total_matches: number | null;
   credibility_score: number | null;
   profile_verified?: boolean;
+  role?: string;  // USER, MODERATOR, ADMIN
+  is_superuser?: boolean;
 }
 
 interface AuthContextType {

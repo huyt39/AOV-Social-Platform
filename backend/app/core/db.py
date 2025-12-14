@@ -4,7 +4,11 @@ from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.config import settings
-from app.models import Comment, CommentLike, Friendship, Item, Post, PostLike, User
+from app.models import (
+    Comment, CommentLike, Friendship, Item, Post, PostLike, User,
+    ForumCategory, ForumThread, ForumThreadLike, 
+    ForumComment, ForumCommentLike, Report
+)
 
 # Global MongoDB client
 mongodb_client: AsyncIOMotorClient | None = None
@@ -24,7 +28,11 @@ async def connect_to_mongodb() -> None:
     # Initialize Beanie with document models
     await init_beanie(
         database=mongodb_client[settings.MONGODB_DB_NAME],
-        document_models=[User, Item, Friendship, Post, PostLike, Comment, CommentLike],
+        document_models=[
+            User, Item, Friendship, Post, PostLike, Comment, CommentLike,
+            ForumCategory, ForumThread, ForumThreadLike, 
+            ForumComment, ForumCommentLike, Report
+        ],
     )
 
     print(f"✅ Connected to MongoDB: {settings.MONGODB_DB_NAME}")
@@ -57,7 +65,7 @@ async def init_db() -> None:
     This function creates the first superuser if it doesn't exist.
     """
     from app import crud
-    from app.models import UserCreate
+    from app.models import UserCreate, UserRole
 
     # Check if superuser exists
     user = await User.find_one(User.email == settings.FIRST_SUPERUSER)
@@ -67,7 +75,8 @@ async def init_db() -> None:
             email=settings.FIRST_SUPERUSER,
             password=settings.FIRST_SUPERUSER_PASSWORD,
             is_superuser=True,
-            username="admin",  # Add default username for first superuser
+            username="admin",
+            role=UserRole.ADMIN,  
         )
         await crud.create_user(user_create=user_in)
         print(f"✅ Created first superuser: {settings.FIRST_SUPERUSER}")

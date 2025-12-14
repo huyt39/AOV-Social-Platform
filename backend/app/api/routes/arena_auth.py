@@ -16,6 +16,7 @@ from app.models import (
     ProfileVerificationData,
     RankEnum,
     User,
+    UserRole,
 )
 from app.services.gemini import gemini_service
 from app.services.upload import UploadServiceFactory
@@ -140,6 +141,7 @@ async def register_arena_user(
         hashed_password=get_password_hash(user_in.password),
         is_active=True,
         is_superuser=False,
+        role=UserRole.USER,
         # Game profile fields from verification
         rank=user_in.rank,
         main_role=user_in.main_role,
@@ -351,6 +353,8 @@ async def get_current_profile(
             "total_matches": current_user.total_matches,
             "credibility_score": current_user.credibility_score,
             "profile_verified": current_user.profile_verified,
+            "role": current_user.role.value if current_user.role else "USER",
+            "is_superuser": current_user.is_superuser,
         },
     }
 
