@@ -20,6 +20,22 @@ async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongodb()
     
+    # Connect to Redis
+    try:
+        from app.services.redis_client import redis_service
+        await redis_service.connect()
+        print("✅ Redis connected")
+    except Exception as e:
+        print(f"⚠️ Redis connection failed: {e}")
+    
+    # Start notification consumer
+    try:
+        from app.services.notification_consumer import notification_consumer
+        await notification_consumer.start()
+        print("✅ Notification consumer started")
+    except Exception as e:
+        print(f"⚠️ Notification consumer failed to start: {e}")
+    
     # Ensure S3 buckets exist
     try:
         from app.services.clawcloud_s3 import clawcloud_s3
@@ -29,7 +45,24 @@ async def lifespan(app: FastAPI):
         print(f"⚠️ S3 bucket setup skipped: {e}")
     
     yield
+    
     # Shutdown
+    # Stop notification consumer
+    try:
+        from app.services.notification_consumer import notification_consumer
+        await notification_consumer.stop()
+        print("❌ Notification consumer stopped")
+    except Exception as e:
+        print(f"⚠️ Error stopping notification consumer: {e}")
+    
+    # Disconnect Redis
+    try:
+        from app.services.redis_client import redis_service
+        await redis_service.disconnect()
+        print("❌ Redis disconnected")
+    except Exception as e:
+        print(f"⚠️ Error disconnecting Redis: {e}")
+    
     await close_mongodb_connection()
 
 

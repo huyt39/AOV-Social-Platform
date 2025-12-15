@@ -138,6 +138,16 @@ from .video import (
     VideoPublic,
 )
 
+# Notification models
+from .notification import (
+    NotificationType,
+    Notification,
+    NotificationActor,
+    NotificationPublic,
+    NotificationsResponse,
+    UnreadCountResponse,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base
@@ -235,4 +245,11 @@ __all__ = [
     "VideoCompleteRequest",
     "VideoProcessedRequest",
     "VideoPublic",
+    # Notification
+    "NotificationType",
+    "Notification",
+    "NotificationActor",
+    "NotificationPublic",
+    "NotificationsResponse",
+    "UnreadCountResponse",
 ]

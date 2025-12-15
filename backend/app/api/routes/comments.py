@@ -17,6 +17,7 @@ from app.models import (
     Post,
     User,
 )
+from app.services.rabbitmq import publish_event, NotificationRoutingKey
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,36 @@ async def create_comment(
     await post.save()
     
     logger.info(f"New comment on post {post_id} by {current_user.username}: {comment.id}")
+    
+    # Publish notification events
+    # 1. Notify post author (if not commenting on own post)
+    if post.author_id != current_user.id:
+        await publish_event(NotificationRoutingKey.POST_COMMENTED, {
+            "actor_id": current_user.id,
+            "user_id": post.author_id,
+            "post_id": post_id,
+            "comment_id": comment.id,
+        })
+    
+    # 2. Notify reply target (if replying to someone else's comment)
+    if reply_to_user_id and reply_to_user_id != current_user.id:
+        await publish_event(NotificationRoutingKey.COMMENT_REPLIED, {
+            "actor_id": current_user.id,
+            "user_id": reply_to_user_id,
+            "post_id": post_id,
+            "comment_id": comment.id,
+            "parent_id": actual_parent_id,
+        })
+    
+    # 3. Notify mentioned users (if any, excluding self)
+    for mentioned_user_id in comment_in.mentions:
+        if mentioned_user_id != current_user.id:
+            await publish_event(NotificationRoutingKey.COMMENT_MENTIONED, {
+                "actor_id": current_user.id,
+                "user_id": mentioned_user_id,
+                "post_id": post_id,
+                "comment_id": comment.id,
+            })
     
     # Return enriched comment
     comment_public = await enrich_comment_with_author(comment, current_user.id)

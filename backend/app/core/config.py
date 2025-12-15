@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     # RabbitMQ Configuration
     RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/"
     
+    # Redis Configuration
+    REDIS_URL: str = "redis://localhost:6379"
+    
     # CDN Configuration (initially same as S3 external endpoint)
     CDN_BASE_URL: str = "https://objectstorageapi.ap-southeast-1.clawcloudrun.com"
     

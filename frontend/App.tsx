@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
+import { Header } from './components/Header';
 import { Feed } from './components/Feed';
 import { LFG } from './components/LFG';
 import { Friends } from './components/Friends';
@@ -28,7 +29,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1) || 'feed';
-      
+
       // Check for profile/:userId pattern
       if (hash.startsWith('profile/')) {
         const userId = hash.split('/')[1];
@@ -109,11 +110,19 @@ const AppContent: React.FC = () => {
   const showNavigation = currentRoute !== 'register' && currentRoute !== 'login';
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-amber-500/30">
-      {showNavigation && <Navigation activeTab={currentRoute} setActiveTab={handleTabChange} />}
-      <main className="flex-1 md:h-screen md:overflow-y-auto relative">
-        {renderContent()}
-      </main>
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-amber-500/30">
+      {/* Top Header */}
+      {showNavigation && <Header onNavigate={handleTabChange} />}
+
+      <div className={`flex flex-col md:flex-row ${showNavigation ? 'pt-14' : ''}`}>
+        {/* Left Sidebar Navigation */}
+        {showNavigation && <Navigation activeTab={currentRoute} setActiveTab={handleTabChange} />}
+
+        {/* Main Content */}
+        <main className="flex-1 md:h-[calc(100vh-3.5rem)] md:overflow-y-auto relative">
+          {renderContent()}
+        </main>
+      </div>
     </div>
   );
 };

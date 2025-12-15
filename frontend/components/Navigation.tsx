@@ -9,7 +9,7 @@ interface NavigationProps {
 
 export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   const { logout, user } = useAuth();
-  
+
   // Check if user is admin (using role from /auth/me or is_superuser)
   const isAdmin = user?.role === 'ADMIN' || user?.is_superuser === true;
 
@@ -20,9 +20,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
     { id: 'friends', icon: UsersRound, label: 'BẠN BÈ' },
     { id: 'guide', icon: Sword, label: 'CẨM NANG' },
     { id: 'coach', icon: MessageSquare, label: 'AI COACH' },
-    { id: 'profile', icon: UserIcon, label: 'HỒ SƠ' },
-    { id: 'settings', icon: Settings, label: 'CÀI ĐẶT' },
-    // Admin only - added conditionally below
+    // Profile and Settings moved to Header
   ];
 
   // Add admin item if user is admin
@@ -31,41 +29,28 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-md border-t border-slate-800 md:relative md:w-72 md:h-screen md:border-r md:border-t-0 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+    <nav className="fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-md border-t border-slate-800 md:relative md:top-0 md:w-60 md:h-[calc(100vh-3.5rem)] md:border-r md:border-t-0 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
       <div className="flex md:flex-col justify-between md:justify-start h-16 md:h-full md:p-0">
-        
-        {/* Logo Area - Desktop only */}
-        <div className="hidden md:flex flex-col items-center justify-center py-8 border-b border-slate-800/50 bg-gradient-to-b from-slate-900 to-slate-950 relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-          <div className="relative z-10 flex items-center gap-3 mb-1">
-             <div className="relative">
-                <div className="absolute inset-0 bg-gold-500 blur-md opacity-50"></div>
-                <Sword className="text-gold-400 w-8 h-8 relative z-10 rotate-45" strokeWidth={2.5} />
-             </div>
-            <h1 className="text-3xl font-display font-bold text-white tracking-wider italic">
-              ARENA<span className="text-gold-500 glow-text">HUB</span>
-            </h1>
-          </div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Liên Quân Mobile Social</p>
-        </div>
+
+        {/* Logo Area - Hidden (now in Header) */}
 
         {/* Nav Items */}
         <div className="flex md:flex-col w-full justify-around md:justify-start md:p-4 md:gap-2">
           {navItems.map((item) => {
-            const isActive = activeTab === item.id || 
-                            (item.id === 'forum' && (activeTab === 'forum-category' || activeTab === 'forum-thread'));
+            const isActive = activeTab === item.id ||
+              (item.id === 'forum' && (activeTab === 'forum-category' || activeTab === 'forum-thread'));
             const isAdminItem = item.id === 'admin';
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={`group relative flex flex-col md:flex-row items-center md:gap-4 p-2 md:px-6 md:py-4 transition-all duration-300 w-full md:text-left overflow-hidden
-                  ${isActive 
-                    ? isAdminItem 
-                      ? 'text-red-400 md:bg-gradient-to-r md:from-red-500/10 md:to-transparent' 
-                      : 'text-gold-400 md:bg-gradient-to-r md:from-gold-500/10 md:to-transparent' 
-                    : isAdminItem 
-                      ? 'text-red-400/60 hover:text-red-400 hover:bg-red-500/10' 
+                  ${isActive
+                    ? isAdminItem
+                      ? 'text-red-400 md:bg-gradient-to-r md:from-red-500/10 md:to-transparent'
+                      : 'text-gold-400 md:bg-gradient-to-r md:from-gold-500/10 md:to-transparent'
+                    : isAdminItem
+                      ? 'text-red-400/60 hover:text-red-400 hover:bg-red-500/10'
                       : 'text-slate-500 hover:text-slate-200 hover:bg-slate-800/30'
                   }
                 `}
@@ -74,14 +59,13 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
                 {isActive && (
                   <div className={`hidden md:block absolute left-0 top-0 bottom-0 w-1 ${isAdminItem ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-gold-500 shadow-[0_0_10px_#f59e0b]'}`}></div>
                 )}
-                
+
                 {/* Icon */}
-                <item.icon 
-                  className={`w-6 h-6 md:w-5 md:h-5 transition-all duration-300 ${
-                    isActive ? 'stroke-[2.5px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'group-hover:scale-110'
-                  }`} 
+                <item.icon
+                  className={`w-6 h-6 md:w-5 md:h-5 transition-all duration-300 ${isActive ? 'stroke-[2.5px] drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'group-hover:scale-110'
+                    }`}
                 />
-                
+
                 {/* Label */}
                 <span className={`text-[10px] md:text-sm font-bold tracking-wider md:font-display uppercase ${isActive ? isAdminItem ? 'text-red-400' : 'text-gold-400' : ''}`}>
                   {item.label}
@@ -96,10 +80,10 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
 
         {/* Footer Info (Desktop) */}
         <div className="hidden md:block mt-auto p-6 border-t border-slate-800/50">
-           <div className="bg-slate-900/50 p-3 rounded border border-slate-800 flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]"></div>
-              <span className="text-xs text-slate-400 font-mono">SERVER: ONLINE</span>
-           </div>
+          <div className="bg-slate-900/50 p-3 rounded border border-slate-800 flex items-center gap-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]"></div>
+            <span className="text-xs text-slate-400 font-mono">SERVER: ONLINE</span>
+          </div>
         </div>
       </div>
     </nav>

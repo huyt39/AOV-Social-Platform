@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.models import (
     Comment, CommentLike, Friendship, Item, Post, PostLike, User,
     ForumCategory, ForumThread, ForumThreadLike, 
-    ForumComment, ForumCommentLike, Report, Video
+    ForumComment, ForumCommentLike, Report, Video, Notification
 )
 
 # Global MongoDB client
@@ -31,7 +31,7 @@ async def connect_to_mongodb() -> None:
         document_models=[
             User, Item, Friendship, Post, PostLike, Comment, CommentLike,
             ForumCategory, ForumThread, ForumThreadLike, 
-            ForumComment, ForumCommentLike, Report, Video
+            ForumComment, ForumCommentLike, Report, Video, Notification
         ],
     )
 

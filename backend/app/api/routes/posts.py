@@ -23,6 +23,7 @@ from app.models import (
     User,
     UserPostsResponse,
 )
+from app.services.rabbitmq import publish_event, NotificationRoutingKey
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,18 @@ async def create_post(
 
     action = "shared" if final_shared_post_id else "created"
     logger.info(f"Post {action} by {current_user.username}: {post.id}")
+
+    # Publish share notification event (if sharing someone else's post)
+    if final_shared_post_id:
+        # Get the original post author
+        original_post = await Post.find_one(Post.id == final_shared_post_id)
+        if original_post and original_post.author_id != current_user.id:
+            await publish_event(NotificationRoutingKey.POST_SHARED, {
+                "actor_id": current_user.id,
+                "user_id": original_post.author_id,
+                "post_id": post.id,
+                "shared_post_id": final_shared_post_id,
+            })
 
     # Return enriched post
     post_public = await enrich_post_with_author(post, current_user.id)
@@ -407,6 +420,14 @@ async def like_post(
     await post.save()
 
     logger.info(f"Post {post_id} liked by {current_user.username}")
+
+    # Publish like notification event (if not liking own post)
+    if post.author_id != current_user.id:
+        await publish_event(NotificationRoutingKey.POST_LIKED, {
+            "actor_id": current_user.id,
+            "user_id": post.author_id,
+            "post_id": post_id,
+        })
 
     return {
         "success": True,

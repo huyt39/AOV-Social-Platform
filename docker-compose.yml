@@ -17,6 +17,19 @@ services:
     ports:
       - "27017:27017"
 
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
   backend:
     image: '${DOCKER_IMAGE_BACKEND:-aov-backend}:${TAG-latest}'
     restart: always
@@ -27,6 +40,8 @@ services:
       mongodb:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     env_file:
       - .env
@@ -41,6 +56,7 @@ services:
       - MONGODB_URL=mongodb://${MONGODB_USER:-admin}:${MONGODB_PASSWORD:-password}@mongodb:27017
       - MONGODB_DB_NAME=${MONGODB_DB_NAME:-arenahub}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URL=redis://redis:6379
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_REGION=${S3_REGION:-ap-southeast-1}
@@ -142,6 +158,7 @@ services:
 
 volumes:
   mongodb-data:
+  redis-data:
 
 networks:
   traefik-public:

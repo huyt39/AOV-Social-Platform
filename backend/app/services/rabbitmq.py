@@ -1,14 +1,14 @@
-"""RabbitMQ service for video processing queue.
+"""RabbitMQ service for video processing and notification events.
 
-Provides async publisher for sending video transcode jobs to the queue.
+Provides async publisher for sending video transcode jobs and notification events to queues.
 """
 
 import json
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 import aio_pika
-from aio_pika import Message, DeliveryMode
+from aio_pika import Message, DeliveryMode, ExchangeType
 
 from app.core.config import settings
 
@@ -17,9 +17,21 @@ logger = logging.getLogger(__name__)
 # Queue names
 VIDEO_TRANSCODE_QUEUE = "video.transcode"
 
+# Exchange names
+EVENTS_EXCHANGE = "events"
+
+# Notification routing keys
+class NotificationRoutingKey:
+    POST_LIKED = "post.liked"
+    POST_COMMENTED = "post.commented"
+    POST_SHARED = "post.shared"
+    COMMENT_MENTIONED = "comment.mentioned"
+    COMMENT_REPLIED = "comment.replied"
+
 # Global connection
 _connection: Optional[aio_pika.Connection] = None
 _channel: Optional[aio_pika.Channel] = None
+_events_exchange: Optional[aio_pika.Exchange] = None
 
 
 async def get_rabbitmq_connection() -> aio_pika.Connection:
@@ -51,9 +63,27 @@ async def get_rabbitmq_channel() -> aio_pika.Channel:
     return _channel
 
 
+async def get_events_exchange() -> aio_pika.Exchange:
+    """Get or create events exchange for notification events."""
+    global _events_exchange
+    
+    if _events_exchange is None:
+        channel = await get_rabbitmq_channel()
+        _events_exchange = await channel.declare_exchange(
+            EVENTS_EXCHANGE,
+            ExchangeType.TOPIC,
+            durable=True
+        )
+        logger.info(f"Declared exchange: {EVENTS_EXCHANGE}")
+    
+    return _events_exchange
+
+
 async def close_rabbitmq_connection() -> None:
     """Close RabbitMQ connection."""
-    global _connection, _channel
+    global _connection, _channel, _events_exchange
+    
+    _events_exchange = None
     
     if _channel and not _channel.is_closed:
         await _channel.close()
@@ -104,6 +134,44 @@ async def publish_transcode_job(video_id: str, raw_key: str) -> bool:
         return False
 
 
+async def publish_event(routing_key: str, payload: dict[str, Any]) -> bool:
+    """
+    Publish notification event to RabbitMQ events exchange.
+    
+    Args:
+        routing_key: Event routing key (e.g., 'post.liked', 'comment.mentioned')
+        payload: Event data containing actor_id, user_id, and relevant IDs
+        
+    Returns:
+        True if published successfully
+    """
+    try:
+        exchange = await get_events_exchange()
+        
+        # Add timestamp to payload
+        payload["timestamp"] = str(import_datetime_now())
+        
+        message_body = json.dumps(payload)
+        
+        message = Message(
+            body=message_body.encode(),
+            delivery_mode=DeliveryMode.PERSISTENT,
+            content_type="application/json"
+        )
+        
+        await exchange.publish(
+            message,
+            routing_key=routing_key
+        )
+        
+        logger.info(f"Published event {routing_key}: {payload}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to publish event {routing_key}: {e}")
+        return False
+
+
 def import_datetime_now():
     """Helper to get current datetime."""
     from datetime import datetime
@@ -117,6 +185,10 @@ class RabbitMQService:
         """Publish transcode job."""
         return await publish_transcode_job(video_id, raw_key)
     
+    async def publish_notification_event(self, routing_key: str, payload: dict[str, Any]) -> bool:
+        """Publish notification event."""
+        return await publish_event(routing_key, payload)
+    
     async def close(self) -> None:
         """Close connections."""
         await close_rabbitmq_connection()
@@ -124,3 +196,4 @@ class RabbitMQService:
 
 # Singleton instance
 rabbitmq_service = RabbitMQService()
+
