@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import admin, arena_auth, comments, forum, friends, notifications, posts, utils, videos, websocket
+from app.api.routes import admin, arena_auth, comments, forum, friends, messages, notifications, posts, utils, videos, websocket
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -13,4 +13,5 @@ api_router.include_router(admin.router)
 api_router.include_router(utils.router)
 api_router.include_router(videos.router)
 api_router.include_router(notifications.router)
+api_router.include_router(messages.router)
 api_router.include_router(websocket.router)

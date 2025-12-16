@@ -148,6 +148,26 @@ from .notification import (
     UnreadCountResponse,
 )
 
+# Conversation/Messaging models
+from .conversation import (
+    ConversationType,
+    ParticipantRole,
+    MessageType,
+    MessageStatus,
+    MediaAttachment,
+    Conversation,
+    ConversationParticipant,
+    Message,
+    ConversationCreate,
+    MessageCreate,
+    ParticipantInfo,
+    MessagePublic,
+    ConversationPublic,
+    ConversationListItem,
+    MessagesResponse,
+    ConversationsResponse,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base
@@ -252,4 +272,21 @@ __all__ = [
     "NotificationPublic",
     "NotificationsResponse",
     "UnreadCountResponse",
+    # Conversation/Messaging
+    "ConversationType",
+    "ParticipantRole",
+    "MessageType",
+    "MessageStatus",
+    "MediaAttachment",
+    "Conversation",
+    "ConversationParticipant",
+    "Message",
+    "ConversationCreate",
+    "MessageCreate",
+    "ParticipantInfo",
+    "MessagePublic",
+    "ConversationPublic",
+    "ConversationListItem",
+    "MessagesResponse",
+    "ConversationsResponse",
 ]

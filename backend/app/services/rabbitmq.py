@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 VIDEO_TRANSCODE_QUEUE = "video.transcode"
 
 # Exchange names
-EVENTS_EXCHANGE = "events"
+EVENTS_EXCHANGE = "events"  # For notifications
+MESSAGE_EVENTS_EXCHANGE = "message_events"  # For messaging
 
 # Notification routing keys
 class NotificationRoutingKey:
@@ -28,10 +29,18 @@ class NotificationRoutingKey:
     COMMENT_MENTIONED = "comment.mentioned"
     COMMENT_REPLIED = "comment.replied"
 
+# Message routing keys
+class MessageRoutingKey:
+    MESSAGE_SENT = "message.sent"
+    MESSAGE_DELIVERED = "message.delivered"
+    MESSAGE_SEEN = "message.seen"
+    TYPING = "message.typing"
+
 # Global connection
 _connection: Optional[aio_pika.Connection] = None
 _channel: Optional[aio_pika.Channel] = None
 _events_exchange: Optional[aio_pika.Exchange] = None
+_message_events_exchange: Optional[aio_pika.Exchange] = None
 
 
 async def get_rabbitmq_connection() -> aio_pika.Connection:
@@ -79,11 +88,28 @@ async def get_events_exchange() -> aio_pika.Exchange:
     return _events_exchange
 
 
+async def get_message_events_exchange() -> aio_pika.Exchange:
+    """Get or create message events exchange for messaging system."""
+    global _message_events_exchange
+    
+    if _message_events_exchange is None:
+        channel = await get_rabbitmq_channel()
+        _message_events_exchange = await channel.declare_exchange(
+            MESSAGE_EVENTS_EXCHANGE,
+            ExchangeType.TOPIC,
+            durable=True
+        )
+        logger.info(f"Declared exchange: {MESSAGE_EVENTS_EXCHANGE}")
+    
+    return _message_events_exchange
+
+
 async def close_rabbitmq_connection() -> None:
     """Close RabbitMQ connection."""
-    global _connection, _channel, _events_exchange
+    global _connection, _channel, _events_exchange, _message_events_exchange
     
     _events_exchange = None
+    _message_events_exchange = None
     
     if _channel and not _channel.is_closed:
         await _channel.close()
@@ -178,6 +204,44 @@ def import_datetime_now():
     return datetime.utcnow().isoformat()
 
 
+async def publish_message_event(routing_key: str, payload: dict[str, Any]) -> bool:
+    """
+    Publish message event to RabbitMQ message events exchange.
+    
+    Args:
+        routing_key: Event routing key (e.g., 'message.sent', 'message.seen')
+        payload: Event data containing message, conversation, and user IDs
+        
+    Returns:
+        True if published successfully
+    """
+    try:
+        exchange = await get_message_events_exchange()
+        
+        # Add timestamp to payload
+        payload["timestamp"] = str(import_datetime_now())
+        
+        message_body = json.dumps(payload)
+        
+        message = Message(
+            body=message_body.encode(),
+            delivery_mode=DeliveryMode.PERSISTENT,
+            content_type="application/json"
+        )
+        
+        await exchange.publish(
+            message,
+            routing_key=routing_key
+        )
+        
+        logger.info(f"Published message event {routing_key}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to publish message event {routing_key}: {e}")
+        return False
+
+
 class RabbitMQService:
     """RabbitMQ service wrapper for dependency injection."""
     
@@ -188,6 +252,10 @@ class RabbitMQService:
     async def publish_notification_event(self, routing_key: str, payload: dict[str, Any]) -> bool:
         """Publish notification event."""
         return await publish_event(routing_key, payload)
+    
+    async def publish_message_event(self, routing_key: str, payload: dict[str, Any]) -> bool:
+        """Publish message event."""
+        return await publish_message_event(routing_key, payload)
     
     async def close(self) -> None:
         """Close connections."""

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, MessageCircle, Bell, ChevronDown, User as UserIcon, Settings, LogOut, X } from 'lucide-react';
 import { useAuth } from '../contexts/authContext';
 import { PostDetailModal } from './PostDetailModal';
+import { Messages } from './Messages';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -72,6 +73,10 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+    // Messages panel state
+    const [showMessages, setShowMessages] = useState(false);
+    const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
     const notificationRef = useRef<HTMLDivElement>(null);
     const profileRef = useRef<HTMLDivElement>(null);
     const allNotificationsRef = useRef<HTMLDivElement>(null);
@@ -94,6 +99,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
     // Fetch unread count on mount
     useEffect(() => {
         fetchUnreadCount();
+        fetchUnreadMessagesCount();
     }, []);
 
     const fetchUnreadCount = async () => {
@@ -111,6 +117,29 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
             }
         } catch (error) {
             console.error('Failed to fetch unread count:', error);
+        }
+    };
+
+    const fetchUnreadMessagesCount = async () => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            if (!token) return;
+
+            const response = await fetch(`${API_URL}/messages/conversations?limit=50`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Sum up all unread counts from conversations
+                const totalUnread = (data.data || []).reduce(
+                    (sum: number, conv: any) => sum + (conv.unread_count || 0),
+                    0
+                );
+                setUnreadMessagesCount(totalUnread);
+            }
+        } catch (error) {
+            console.error('Failed to fetch unread messages count:', error);
         }
     };
 
@@ -320,14 +349,18 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                             <Search className="w-5 h-5 text-slate-300" />
                         </button>
 
-                        {/* Message Icon (placeholder) */}
+                        {/* Message Icon */}
                         <button
+                            onClick={() => setShowMessages(true)}
                             className="p-2.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors relative"
                             title="Tin nhắn"
                         >
                             <MessageCircle className="w-5 h-5 text-slate-300" />
-                            {/* Placeholder badge */}
-                            {/* <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center">2</span> */}
+                            {unreadMessagesCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center px-1 text-white">
+                                    {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                                </span>
+                            )}
                         </button>
 
                         {/* Notifications */}
@@ -645,6 +678,13 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                     </div>
                 </div>
             )}
+
+            {/* Messages Panel */}
+            <Messages
+                isOpen={showMessages}
+                onClose={() => setShowMessages(false)}
+                onRefreshUnread={fetchUnreadMessagesCount}
+            />
         </>
     );
 };

@@ -118,6 +118,29 @@ class RedisService:
         logger.debug(f"Published notification to {channel}, {count} receivers")
         return count
     
+    async def publish_to_user(
+        self, 
+        user_id: str, 
+        channel_type: str, 
+        payload: dict[str, Any]
+    ) -> int:
+        """
+        Publish to a user's specific channel.
+        
+        Args:
+            user_id: Target user ID
+            channel_type: Channel type ("notification" or "message")
+            payload: Data to send
+            
+        Returns:
+            Number of subscribers that received the message
+        """
+        channel = f"{channel_type}:user:{user_id}"
+        message = json.dumps(payload)
+        count = await self.client.publish(channel, message)
+        logger.debug(f"Published to {channel}, {count} receivers")
+        return count
+    
     async def subscribe_user_notifications(
         self, 
         user_id: str, 

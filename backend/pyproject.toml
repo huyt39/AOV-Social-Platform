@@ -30,6 +30,7 @@ dependencies = [
     "aioboto3",
     "aio-pika>=9.4.0",
     "redis>=5.0.0",
+    "websockets>=15.0.1",
 ]
 
 [tool.uv]

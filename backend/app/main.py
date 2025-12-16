@@ -36,6 +36,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️ Notification consumer failed to start: {e}")
     
+    # Start message consumer
+    try:
+        from app.services.message_consumer import message_consumer
+        await message_consumer.start()
+        print("✅ Message consumer started")
+    except Exception as e:
+        print(f"⚠️ Message consumer failed to start: {e}")
+    
     # Ensure S3 buckets exist
     try:
         from app.services.clawcloud_s3 import clawcloud_s3
@@ -47,6 +55,14 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
+    # Stop message consumer
+    try:
+        from app.services.message_consumer import message_consumer
+        await message_consumer.stop()
+        print("❌ Message consumer stopped")
+    except Exception as e:
+        print(f"⚠️ Error stopping message consumer: {e}")
+    
     # Stop notification consumer
     try:
         from app.services.notification_consumer import notification_consumer
