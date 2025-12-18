@@ -138,6 +138,17 @@ from .video import (
     VideoPublic,
 )
 
+# Reel models
+from .reel import (
+    Reel,
+    ReelView,
+    ReelLike,
+    ReelCreateRequest,
+    ReelPublic,
+    ReelViewRequest,
+    ReelFeedResponse,
+)
+
 # Notification models
 from .notification import (
     NotificationType,
@@ -265,6 +276,14 @@ __all__ = [
     "VideoCompleteRequest",
     "VideoProcessedRequest",
     "VideoPublic",
+    # Reel
+    "Reel",
+    "ReelView",
+    "ReelLike",
+    "ReelCreateRequest",
+    "ReelPublic",
+    "ReelViewRequest",
+    "ReelFeedResponse",
     # Notification
     "NotificationType",
     "Notification",

@@ -8,7 +8,8 @@ from app.models import (
     Comment, CommentLike, Friendship, Item, Post, PostLike, User,
     ForumCategory, ForumThread, ForumThreadLike, 
     ForumComment, ForumCommentLike, Report, Video, Notification,
-    Conversation, ConversationParticipant, Message
+    Conversation, ConversationParticipant, Message,
+    Reel, ReelView, ReelLike
 )
 
 # Global MongoDB client
@@ -33,7 +34,8 @@ async def connect_to_mongodb() -> None:
             User, Item, Friendship, Post, PostLike, Comment, CommentLike,
             ForumCategory, ForumThread, ForumThreadLike, 
             ForumComment, ForumCommentLike, Report, Video, Notification,
-            Conversation, ConversationParticipant, Message
+            Conversation, ConversationParticipant, Message,
+            Reel, ReelView, ReelLike
         ],
     )
 
