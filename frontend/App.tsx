@@ -14,9 +14,10 @@ import { Forum } from './components/Forum';
 import { ForumCategoryPage } from './components/ForumCategory';
 import { ForumThreadPage } from './components/ForumThread';
 import { AdminDashboard } from './components/AdminDashboard';
+import { Reels } from './components/Reels';
 import { AuthProvider, useAuth } from './contexts/authContext';
 
-type Route = 'feed' | 'lfg' | 'friends' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin';
+type Route = 'feed' | 'reels' | 'lfg' | 'friends' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin';
 
 const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('feed');
@@ -92,6 +93,7 @@ const AppContent: React.FC = () => {
       case 'register': return <Register />;
       case 'login': return <Login />;
       case 'feed': return <Feed />;
+      case 'reels': return <Reels />;
       case 'lfg': return <LFG />;
       case 'friends': return <Friends />;
       case 'guide': return <Guide />;
@@ -106,7 +108,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Hide navigation on auth pages
+  // Hide navigation only on auth pages
   const showNavigation = currentRoute !== 'register' && currentRoute !== 'login';
 
   return (
