@@ -1,0 +1,92 @@
+name: Deploy to Amazon ECS
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECS_CLUSTER: aov-cluster
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    # --- Build & Deploy Backend ---
+    - name: Build and push Backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/aov-backend:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/aov-backend:${{ github.sha }}
+
+    - name: Download Backend task definition
+      run: |
+        aws ecs describe-task-definition --task-definition aov-backend-task --query taskDefinition > task-definition-backend.json
+
+    - name: Update Backend task definition
+      id: task-def-backend
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition-backend.json
+        container-name: aov-backend
+        image: ${{ secrets.DOCKERHUB_USERNAME }}/aov-backend:${{ github.sha }}
+
+    - name: Deploy Backend to ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
+        service: service-backend
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+
+    # --- Build & Deploy Video Worker ---
+    - name: Build and push Video Worker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./video-worker
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:${{ github.sha }}
+
+    - name: Download Worker task definition
+      run: |
+        aws ecs describe-task-definition --task-definition aov-worker-task --query taskDefinition > task-definition-worker.json
+
+    - name: Update Worker task definition
+      id: task-def-worker
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition-worker.json
+        container-name: aov-worker-task
+        image: ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:${{ github.sha }}
+
+    - name: Deploy Worker to ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def-worker.outputs.task-definition }}
+        service: service-worker
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true

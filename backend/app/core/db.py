@@ -25,7 +25,12 @@ async def connect_to_mongodb() -> None:
     global mongodb_client
 
     # Create MongoDB client
-    mongodb_client = AsyncIOMotorClient(settings.MONGODB_URL)
+    # Create MongoDB client
+    import certifi
+    mongodb_client = AsyncIOMotorClient(
+        settings.MONGODB_URL,
+        tlsCAFile=certifi.where()
+    )
 
     # Initialize Beanie with document models
     await init_beanie(

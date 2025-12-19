@@ -33,7 +33,11 @@ class RedisService:
             self._client = redis.from_url(
                 settings.REDIS_URL,
                 encoding="utf-8",
-                decode_responses=True
+                decode_responses=True,
+                socket_connect_timeout=10.0,  # 10 second timeout for initial connection
+                # Note: socket_timeout intentionally not set for PubSub compatibility
+                # PubSub needs to wait indefinitely for messages
+                health_check_interval=30,  # Send PING every 30 seconds to keep connection alive
             )
             # Test connection
             await self._client.ping()
@@ -162,20 +166,41 @@ class RedisService:
         logger.debug(f"Subscribed to {channel}")
         
         async def listener():
-            try:
-                async for message in pubsub.listen():
-                    if message["type"] == "message":
-                        try:
-                            data = json.loads(message["data"])
-                            await callback(data)
-                        except json.JSONDecodeError:
-                            logger.error(f"Invalid JSON in notification: {message['data']}")
-                        except Exception as e:
-                            logger.error(f"Error in notification callback: {e}")
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                logger.error(f"Error in notification listener: {e}")
+            retry_count = 0
+            max_retries = 10
+            base_delay = 1  # seconds
+            
+            while retry_count < max_retries:
+                try:
+                    async for message in pubsub.listen():
+                        # Reset retry count on successful message
+                        retry_count = 0
+                        if message["type"] == "message":
+                            try:
+                                data = json.loads(message["data"])
+                                await callback(data)
+                            except json.JSONDecodeError:
+                                logger.error(f"Invalid JSON in notification: {message['data']}")
+                            except Exception as e:
+                                logger.error(f"Error in notification callback: {e}")
+                except asyncio.CancelledError:
+                    logger.debug(f"Listener cancelled for {channel}")
+                    break
+                except Exception as e:
+                    retry_count += 1
+                    delay = min(base_delay * (2 ** retry_count), 30)  # Max 30 seconds
+                    logger.warning(f"Notification listener error (attempt {retry_count}): {e}. Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                    
+                    # Try to resubscribe
+                    try:
+                        await pubsub.subscribe(channel)
+                        logger.info(f"Resubscribed to {channel}")
+                    except Exception as resub_error:
+                        logger.error(f"Failed to resubscribe: {resub_error}")
+            
+            if retry_count >= max_retries:
+                logger.error(f"Max retries reached for {channel}, listener stopped")
         
         # Start listener in background
         asyncio.create_task(listener())
@@ -205,23 +230,44 @@ class RedisService:
         logger.info(f"Subscribed to pattern {pattern}")
         
         async def listener():
-            try:
-                async for message in self._pubsub.listen():
-                    if message["type"] == "pmessage":
-                        try:
-                            channel = message["channel"]
-                            # Extract user_id from channel: notification:user:{user_id}
-                            user_id = channel.split(":")[-1]
-                            data = json.loads(message["data"])
-                            await callback(user_id, data)
-                        except json.JSONDecodeError:
-                            logger.error(f"Invalid JSON in notification: {message['data']}")
-                        except Exception as e:
-                            logger.error(f"Error in notification callback: {e}")
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                logger.error(f"Error in notification listener: {e}")
+            retry_count = 0
+            max_retries = 10
+            base_delay = 1  # seconds
+            
+            while retry_count < max_retries:
+                try:
+                    async for message in self._pubsub.listen():
+                        # Reset retry count on successful message
+                        retry_count = 0
+                        if message["type"] == "pmessage":
+                            try:
+                                channel = message["channel"]
+                                # Extract user_id from channel: notification:user:{user_id}
+                                user_id = channel.split(":")[-1]
+                                data = json.loads(message["data"])
+                                await callback(user_id, data)
+                            except json.JSONDecodeError:
+                                logger.error(f"Invalid JSON in notification: {message['data']}")
+                            except Exception as e:
+                                logger.error(f"Error in notification callback: {e}")
+                except asyncio.CancelledError:
+                    logger.debug("Pattern listener cancelled")
+                    break
+                except Exception as e:
+                    retry_count += 1
+                    delay = min(base_delay * (2 ** retry_count), 30)  # Max 30 seconds
+                    logger.warning(f"Pattern listener error (attempt {retry_count}): {e}. Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                    
+                    # Try to resubscribe
+                    try:
+                        await self._pubsub.psubscribe(pattern)
+                        logger.info(f"Resubscribed to pattern {pattern}")
+                    except Exception as resub_error:
+                        logger.error(f"Failed to resubscribe to pattern: {resub_error}")
+            
+            if retry_count >= max_retries:
+                logger.error(f"Max retries reached for pattern {pattern}, listener stopped")
         
         self._listener_task = asyncio.create_task(listener())
         

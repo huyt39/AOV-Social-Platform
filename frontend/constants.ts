@@ -1,7 +1,7 @@
 import { Rank, Role, User, Post } from './types';
 
-// API Base URL
-export const API_BASE_URL = 'http://localhost:8000/api/v1';
+// API Base URL - Use environment variable with localhost fallback for development
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const CURRENT_USER: User = {
   id: 'u1',
