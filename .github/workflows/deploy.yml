@@ -57,7 +57,7 @@ jobs:
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
-        service: service-backend
+        service: aov-backend-service
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
 
@@ -65,7 +65,7 @@ jobs:
     - name: Get Backend Private IP
       id: get-backend-ip
       run: |
-        TASK_ARN=$(aws ecs list-tasks --cluster ${{ env.ECS_CLUSTER }} --service-name service-backend --query 'taskArns[0]' --output text)
+        TASK_ARN=$(aws ecs list-tasks --cluster ${{ env.ECS_CLUSTER }} --service-name aov-backend-service --query 'taskArns[0]' --output text)
         BACKEND_IP=$(aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks $TASK_ARN --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' --output text)
         echo "backend_ip=$BACKEND_IP" >> $GITHUB_OUTPUT
         echo "✅ Backend Private IP: $BACKEND_IP"
@@ -74,7 +74,7 @@ jobs:
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.NGINX_EC2_HOST }}
-        username: ubuntu
+        username: ec2-user
         key: ${{ secrets.NGINX_EC2_SSH_KEY }}
         script: |
           BACKEND_IP="${{ steps.get-backend-ip.outputs.backend_ip }}"
@@ -108,6 +108,6 @@ jobs:
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def-worker.outputs.task-definition }}
-        service: service-worker
+        service: aov-worker-task-service-leont8u5
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
