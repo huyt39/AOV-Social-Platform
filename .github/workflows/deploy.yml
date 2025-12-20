@@ -61,6 +61,27 @@ jobs:
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
 
+    # --- Auto Update Nginx with Backend IP ---
+    - name: Get Backend Private IP
+      id: get-backend-ip
+      run: |
+        TASK_ARN=$(aws ecs list-tasks --cluster ${{ env.ECS_CLUSTER }} --service-name service-backend --query 'taskArns[0]' --output text)
+        BACKEND_IP=$(aws ecs describe-tasks --cluster ${{ env.ECS_CLUSTER }} --tasks $TASK_ARN --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' --output text)
+        echo "backend_ip=$BACKEND_IP" >> $GITHUB_OUTPUT
+        echo "✅ Backend Private IP: $BACKEND_IP"
+
+    - name: Update Nginx with Backend IP
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.NGINX_EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.NGINX_EC2_SSH_KEY }}
+        script: |
+          BACKEND_IP="${{ steps.get-backend-ip.outputs.backend_ip }}"
+          sudo sed -i "s|proxy_pass http://[0-9.]*:8000|proxy_pass http://${BACKEND_IP}:8000|g" /etc/nginx/conf.d/aov-app.conf
+          sudo nginx -t && sudo systemctl reload nginx
+          echo "✅ Nginx updated with Backend IP: $BACKEND_IP"
+
     # --- Build & Deploy Video Worker ---
     - name: Build and push Video Worker image
       uses: docker/build-push-action@v5

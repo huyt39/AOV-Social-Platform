@@ -264,20 +264,55 @@ async def websocket_endpoint(
         message_channel = f"message:user:{user_id}"
         await message_pubsub.subscribe(message_channel)
         
-        # Start message listener
+        # Start message listener with retry logic
         async def message_listener():
-            try:
-                async for msg in message_pubsub.listen():
-                    if msg["type"] == "message":
+            nonlocal message_pubsub
+            retry_count = 0
+            max_retries = 10
+            base_delay = 1  # seconds
+            
+            while retry_count < max_retries:
+                try:
+                    async for msg in message_pubsub.listen():
+                        # Reset retry count on successful message
+                        retry_count = 0
+                        if msg["type"] == "message":
+                            try:
+                                data = json.loads(msg["data"])
+                                await message_callback(data)
+                            except json.JSONDecodeError:
+                                pass
+                except asyncio.CancelledError:
+                    logger.debug(f"Message listener cancelled for user {user_id}")
+                    return
+                except Exception as e:
+                    retry_count += 1
+                    delay = min(base_delay * (2 ** retry_count), 30)  # Max 30 seconds
+                    logger.warning(
+                        f"Message listener error for user {user_id} (attempt {retry_count}): {e}. "
+                        f"Retrying in {delay}s..."
+                    )
+                    
+                    if retry_count >= max_retries:
+                        logger.error(f"Max retries reached for message listener, stopping for user {user_id}")
+                        return
+                    
+                    await asyncio.sleep(delay)
+                    
+                    # Try to recreate PubSub connection
+                    try:
+                        # Close old connection
                         try:
-                            data = json.loads(msg["data"])
-                            await message_callback(data)
-                        except json.JSONDecodeError:
+                            await message_pubsub.close()
+                        except Exception:
                             pass
-            except asyncio.CancelledError:
-                pass
-            except Exception as e:
-                logger.error(f"Message listener error: {e}")
+                        
+                        # Create new connection
+                        message_pubsub = redis_service.client.pubsub()
+                        await message_pubsub.subscribe(message_channel)
+                        logger.info(f"Resubscribed to message channel for user {user_id}")
+                    except Exception as resub_error:
+                        logger.error(f"Failed to resubscribe: {resub_error}")
         
         message_listener_task = asyncio.create_task(message_listener())
         
