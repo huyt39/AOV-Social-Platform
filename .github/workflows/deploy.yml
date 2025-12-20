@@ -54,7 +54,7 @@ jobs:
         image: ${{ secrets.DOCKERHUB_USERNAME }}/aov-backend:${{ github.sha }}
 
     - name: Deploy Backend to ECS
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
         service: service-backend
@@ -105,7 +105,7 @@ jobs:
         image: ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:${{ github.sha }}
 
     - name: Deploy Worker to ECS
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def-worker.outputs.task-definition }}
         service: service-worker
