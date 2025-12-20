@@ -19,59 +19,14 @@ from app.models import (
     Video,
     VideoStatus,
 )
+from app.services.clawcloud_s3 import clawcloud_s3
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/reels", tags=["reels"])
 
-# Sample AOV gameplay videos to show when no user reels exist
-SAMPLE_REELS = [
-    {
-        "id": "sample-reel-1",
-        "user_id": "system",
-        "username": "AOV Official",
-        "video_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/256844940/movie480_vp9.webm",
-        "thumbnail_url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1649080/capsule_616x353.jpg",
-        "duration": 30,
-        "caption": "Highlight gameplay AOV - Chiến thuật đội hình hoàn hảo! 🎮⚔️",
-        "music_name": "Epic Battle Theme",
-        "music_artist": "AOV OST",
-        "views_count": 12500,
-        "likes_count": 850,
-        "comments_count": 45,
-        "shares_count": 23,
-    },
-    {
-        "id": "sample-reel-2",
-        "user_id": "system",
-        "username": "ProGamer",
-        "video_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/256844941/movie480_vp9.webm",
-        "thumbnail_url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1649080/ss_56b22fbb5c4baf71cbf4a1a3699f3d1a3e35cd76.1920x1080.jpg",
-        "duration": 25,
-        "caption": "Combo skill siêu đỉnh! Bạn đã thử chưa? 🔥💪",
-        "music_name": "Victory March",
-        "music_artist": "AOV",
-        "views_count": 8900,
-        "likes_count": 620,
-        "comments_count": 32,
-        "shares_count": 15,
-    },
-    {
-        "id": "sample-reel-3",
-        "user_id": "system",
-        "username": "MasterRank",
-        "video_url": "https://cdn.cloudflare.steamstatic.com/steam/apps/256844942/movie480_vp9.webm",
-        "thumbnail_url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1649080/ss_93bf87e6d0e20ff0c0b11e9a4c12e62d8c1b7949.1920x1080.jpg",
-        "duration": 35,
-        "caption": "Hướng dẫn Farm nhanh lên cấp cho tân thủ 📈✨",
-        "music_name": "Power Up",
-        "music_artist": "Game Music",
-        "views_count": 15200,
-        "likes_count": 1100,
-        "comments_count": 67,
-        "shares_count": 38,
-    },
-]
+
 
 
 
@@ -82,6 +37,9 @@ async def create_reel(
 ) -> Any:
     """
     Create a new reel from an uploaded video.
+    
+    Allows creating reels with videos that are still PROCESSING.
+    Raw video URL is used as fallback until processing completes.
     """
     # Verify video exists and belongs to user
     video = await Video.find_one(Video.id == reel_data.video_id)
@@ -91,8 +49,24 @@ async def create_reel(
     if video.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to use this video")
     
-    if video.status != VideoStatus.READY:
+    # Allow PROCESSING or READY status
+    if video.status not in [VideoStatus.PROCESSING, VideoStatus.READY]:
         raise HTTPException(status_code=400, detail="Video is not ready yet")
+    
+    # Determine URLs based on video status
+    video_processed = video.status == VideoStatus.READY
+    if video_processed:
+        video_url = video.play_url or ""
+        video_raw_url = None
+        thumbnail_url = video.thumbnail_url or ""
+    else:
+        # Video is still processing - use raw URL
+        video_raw_url = clawcloud_s3.get_public_url(
+            settings.S3_RAW_BUCKET, 
+            video.raw_key
+        )
+        video_url = video_raw_url  # Temp use raw as main URL
+        thumbnail_url = ""  # No thumbnail yet
     
     # Create reel
     reel = Reel(
@@ -101,14 +75,16 @@ async def create_reel(
         caption=reel_data.caption,
         music_name=reel_data.music_name,
         music_artist=reel_data.music_artist,
-        video_url=video.play_url or "",
-        thumbnail_url=video.thumbnail_url or "",
+        video_url=video_url,
+        video_raw_url=video_raw_url,
+        thumbnail_url=thumbnail_url,
         duration=video.duration or 0,
+        video_processed=video_processed,
     )
     
     await reel.insert()
     
-    logger.info(f"Reel created: {reel.id} by user {current_user.id}")
+    logger.info(f"Reel created: {reel.id} by user {current_user.id} (processed: {video_processed})")
     
     return ReelPublic(
         id=reel.id,
@@ -116,8 +92,10 @@ async def create_reel(
         username=current_user.username,
         user_avatar=None,
         video_url=reel.video_url,
+        video_raw_url=reel.video_raw_url,
         thumbnail_url=reel.thumbnail_url,
         duration=reel.duration,
+        video_processed=reel.video_processed,
         caption=reel.caption,
         music_name=reel.music_name,
         music_artist=reel.music_artist,
@@ -148,9 +126,13 @@ async def get_reel_feed(
     logger.info(f"User {current_user.id} has viewed {len(viewed_reel_ids)} reels")
     
     # Query for reels not yet viewed
-    query = Reel.find(Reel.is_active == True)
     if viewed_reel_ids:
-        query = query.find(Reel.id.nin(viewed_reel_ids))  # type: ignore
+        query = Reel.find(
+            Reel.is_active == True,
+            {"_id": {"$nin": viewed_reel_ids}}
+        )
+    else:
+        query = Reel.find(Reel.is_active == True)
     
     all_unviewed_reels = await query.to_list()
     
@@ -159,32 +141,11 @@ async def get_reel_feed(
         logger.info(f"User {current_user.id} has viewed all reels, resampling from all reels")
         all_unviewed_reels = await Reel.find(Reel.is_active == True).to_list()
         
-        # If still no reels at all, return sample videos
+        # If still no reels at all, return empty list
         if not all_unviewed_reels:
-            logger.info(f"No reels available in the system, returning sample videos")
-            sample_reel_publics = [
-                ReelPublic(
-                    id=sample["id"],
-                    user_id=sample["user_id"],
-                    username=sample["username"],
-                    user_avatar=None,
-                    video_url=sample["video_url"],
-                    thumbnail_url=sample["thumbnail_url"],
-                    duration=sample["duration"],
-                    caption=sample["caption"],
-                    music_name=sample["music_name"],
-                    music_artist=sample["music_artist"],
-                    views_count=sample["views_count"],
-                    likes_count=sample["likes_count"],
-                    comments_count=sample["comments_count"],
-                    shares_count=sample["shares_count"],
-                    is_liked=False,
-                    created_at=datetime.utcnow(),
-                )
-                for sample in SAMPLE_REELS
-            ]
+            logger.info(f"No reels available in the system")
             return ReelFeedResponse(
-                reels=sample_reel_publics,
+                reels=[],
                 has_more=False,
             )
     
@@ -218,8 +179,10 @@ async def get_reel_feed(
                 username=user.username if user else "Unknown",
                 user_avatar=None,
                 video_url=reel.video_url,
+                video_raw_url=reel.video_raw_url,
                 thumbnail_url=reel.thumbnail_url,
                 duration=reel.duration,
+                video_processed=reel.video_processed,
                 caption=reel.caption,
                 music_name=reel.music_name,
                 music_artist=reel.music_artist,
@@ -371,8 +334,10 @@ async def get_reel(
         username=user.username if user else "Unknown",
         user_avatar=None,
         video_url=reel.video_url,
+        video_raw_url=reel.video_raw_url,
         thumbnail_url=reel.thumbnail_url,
         duration=reel.duration,
+        video_processed=reel.video_processed,
         caption=reel.caption,
         music_name=reel.music_name,
         music_artist=reel.music_artist,
@@ -405,4 +370,3 @@ async def delete_reel(
     logger.info(f"Reel deleted: {reel_id} by user {current_user.id}")
     
     return {"success": True, "message": "Reel deleted successfully"}
-

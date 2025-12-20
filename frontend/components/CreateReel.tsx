@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, Music, FileVideo, Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, X, FileVideo, Loader, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface CreateReelProps {
   onClose: () => void;
@@ -10,13 +10,12 @@ export const CreateReel: React.FC<CreateReelProps> = ({ onClose, onSuccess }) =>
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [caption, setCaption] = useState('');
-  const [musicName, setMusicName] = useState('');
-  const [musicArtist, setMusicArtist] = useState('');
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -39,7 +38,7 @@ export const CreateReel: React.FC<CreateReelProps> = ({ onClose, onSuccess }) =>
 
     setVideoFile(file);
     setError('');
-    
+
     // Create preview URL
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
@@ -116,8 +115,6 @@ export const CreateReel: React.FC<CreateReelProps> = ({ onClose, onSuccess }) =>
         body: JSON.stringify({
           video_id: video_id,
           caption: caption || undefined,
-          music_name: musicName || undefined,
-          music_artist: musicArtist || undefined,
         }),
       });
 
@@ -128,7 +125,7 @@ export const CreateReel: React.FC<CreateReelProps> = ({ onClose, onSuccess }) =>
 
       setUploadProgress(100);
       setSuccess(true);
-      
+
       // Close after 2 seconds
       setTimeout(() => {
         onSuccess();
@@ -168,7 +165,7 @@ export const CreateReel: React.FC<CreateReelProps> = ({ onClose, onSuccess }) =>
             <label className="block text-slate-300 text-sm font-bold mb-3">
               Video *
             </label>
-            
+
             {!videoFile ? (
               <div
                 onClick={() => fileInputRef.current?.click()}
@@ -229,36 +226,7 @@ export const CreateReel: React.FC<CreateReelProps> = ({ onClose, onSuccess }) =>
             </p>
           </div>
 
-          {/* Music Info */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-slate-300 text-sm font-bold mb-2 flex items-center gap-2">
-                <Music className="w-4 h-4" />
-                Tên nhạc
-              </label>
-              <input
-                type="text"
-                value={musicName}
-                onChange={(e) => setMusicName(e.target.value)}
-                placeholder="Epic Gaming Music"
-                className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-gold-500 transition"
-                disabled={isUploading}
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 text-sm font-bold mb-2">
-                Nghệ sĩ
-              </label>
-              <input
-                type="text"
-                value={musicArtist}
-                onChange={(e) => setMusicArtist(e.target.value)}
-                placeholder="Artist Name"
-                className="w-full bg-slate-950/50 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-gold-500 transition"
-                disabled={isUploading}
-              />
-            </div>
-          </div>
+
 
           {/* Progress Bar */}
           {isUploading && (

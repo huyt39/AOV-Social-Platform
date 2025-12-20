@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, Sword, MessageSquare, User as UserIcon, Settings, LogOut, UsersRound, MessagesSquare, Shield, PlayCircle } from 'lucide-react';
+import { Home, Users, MessagesSquare, User as UserIcon, Settings, LogOut, UsersRound, Shield, PlayCircle } from 'lucide-react';
 import { useAuth } from '../contexts/authContext';
 
 interface NavigationProps {
@@ -19,8 +19,6 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
     { id: 'forum', icon: MessagesSquare, label: 'DIỄN ĐÀN' },
     { id: 'lfg', icon: Users, label: 'TÌM TEAM' },
     { id: 'friends', icon: UsersRound, label: 'BẠN BÈ' },
-    { id: 'guide', icon: Sword, label: 'CẨM NANG' },
-    { id: 'coach', icon: MessageSquare, label: 'AI COACH' },
     // Profile and Settings moved to Header
   ];
 

@@ -4,8 +4,6 @@ import { Header } from './components/Header';
 import { Feed } from './components/Feed';
 import { LFG } from './components/LFG';
 import { Friends } from './components/Friends';
-import { Guide } from './components/Guide';
-import { AICoach } from './components/AICoach';
 import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
 import { Register } from './components/Register';
@@ -17,7 +15,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { Reels } from './components/Reels';
 import { AuthProvider, useAuth } from './contexts/authContext';
 
-type Route = 'feed' | 'reels' | 'lfg' | 'friends' | 'guide' | 'coach' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin';
+type Route = 'feed' | 'reels' | 'lfg' | 'friends' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin';
 
 const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('feed');
@@ -96,8 +94,6 @@ const AppContent: React.FC = () => {
       case 'reels': return <Reels />;
       case 'lfg': return <LFG />;
       case 'friends': return <Friends />;
-      case 'guide': return <Guide />;
-      case 'coach': return <AICoach />;
       case 'profile': return <Profile userId={profileUserId} />;
       case 'settings': return <Settings />;
       case 'forum': return <Forum />;

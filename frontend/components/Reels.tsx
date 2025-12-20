@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Music, MoreVertical, RefreshCw, AlertCircle, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Heart, MoreVertical, AlertCircle, Plus, ChevronUp, ChevronDown, Volume2, VolumeX, PlayCircle } from 'lucide-react';
 import { CreateReel } from './CreateReel';
 
 interface ReelData {
@@ -8,11 +8,12 @@ interface ReelData {
   username: string;
   user_avatar?: string;
   video_url: string;
+  video_raw_url?: string;  // Raw video URL (fallback when not processed)
   thumbnail_url: string;
   duration: number;
+  video_processed?: boolean;  // Flag indicating video processing complete
   caption?: string;
-  music_name?: string;
-  music_artist?: string;
+
   views_count: number;
   likes_count: number;
   comments_count: number;
@@ -33,6 +34,7 @@ export const Reels: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [hasMore, setHasMore] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Muted by default for autoplay
 
   const videoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,11 +50,14 @@ export const Reels: React.FC = () => {
 
   // Play/pause videos based on current index
   useEffect(() => {
+    if (reels.length === 0) return;
+
     Object.keys(videoRefs.current).forEach((key) => {
       const index = parseInt(key);
       const video = videoRefs.current[index];
       if (video) {
         if (index === currentIndex) {
+          video.muted = isMuted; // Ensure muted state is synced
           video.play().catch(err => console.error('Play error:', err));
         } else {
           video.pause();
@@ -60,7 +65,7 @@ export const Reels: React.FC = () => {
         }
       }
     });
-  }, [currentIndex]);
+  }, [currentIndex, reels, isMuted]);
 
   // Mark reel as viewed when it plays
   useEffect(() => {
@@ -117,21 +122,6 @@ export const Reels: React.FC = () => {
   };
 
   const handleLike = async (reelId: string, currentlyLiked: boolean) => {
-    // Check if it's a sample reel (no API call needed)
-    if (reelId.startsWith('sample-')) {
-      // Just update local state for sample reels
-      setReels(prev => prev.map(reel =>
-        reel.id === reelId
-          ? {
-            ...reel,
-            is_liked: !currentlyLiked,
-            likes_count: currentlyLiked ? reel.likes_count - 1 : reel.likes_count + 1
-          }
-          : reel
-      ));
-      return;
-    }
-
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(`${API_URL}/reels/${reelId}/like`, {
@@ -202,7 +192,7 @@ export const Reels: React.FC = () => {
     }
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
+  const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     if (e.deltaY > 0) {
       handleScroll('down');
@@ -210,6 +200,18 @@ export const Reels: React.FC = () => {
       handleScroll('up');
     }
   };
+
+  // Use native wheel event listener with passive: false to prevent scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
 
   if (isLoading && reels.length === 0) {
     return (
@@ -239,6 +241,41 @@ export const Reels: React.FC = () => {
     );
   }
 
+  // Empty state when no reels available
+  if (reels.length === 0) {
+    return (
+      <>
+        {showCreateModal && (
+          <CreateReel
+            onClose={() => setShowCreateModal(false)}
+            onSuccess={() => {
+              loadReels();
+              setCurrentIndex(0);
+            }}
+          />
+        )}
+        <div className="h-screen md:h-[calc(100vh-3.5rem)] bg-gradient-to-b from-slate-900 to-black flex items-center justify-center">
+          <div className="text-white text-center px-6 max-w-md">
+            <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-gold-500/20 to-amber-500/20 rounded-full flex items-center justify-center border border-gold-500/30">
+              <PlayCircle className="w-12 h-12 text-gold-400" />
+            </div>
+            <h2 className="text-2xl font-bold mb-3 text-gold-400">Chưa có Reel nào</h2>
+            <p className="text-slate-400 mb-6">
+              Hãy là người đầu tiên chia sẻ khoảnh khắc gameplay của bạn!
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-8 py-3 bg-gradient-to-r from-gold-500 to-amber-500 text-black rounded-lg font-bold hover:from-gold-600 hover:to-amber-600 transition-all flex items-center gap-2 mx-auto"
+            >
+              <Plus className="w-5 h-5" />
+              Tạo Reel đầu tiên
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const currentReel = reels[currentIndex];
 
   return (
@@ -257,7 +294,6 @@ export const Reels: React.FC = () => {
       <div
         ref={containerRef}
         className="h-screen md:h-[calc(100vh-3.5rem)] bg-black overflow-hidden relative"
-        onWheel={handleWheel}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -270,13 +306,16 @@ export const Reels: React.FC = () => {
                 }`}
             >
               <video
-                ref={el => videoRefs.current[index] = el}
-                src={reel.video_url}
+                ref={(el) => {
+                  if (el) videoRefs.current[index] = el;
+                }}
+                src={reel.video_processed ? reel.video_url : (reel.video_raw_url || reel.video_url)}
                 poster={reel.thumbnail_url}
                 className="w-full h-full object-contain"
                 loop
                 playsInline
-                muted={false}
+                muted={isMuted}
+                onClick={() => setIsMuted(!isMuted)}
               />
             </div>
           ))}
@@ -355,16 +394,11 @@ export const Reels: React.FC = () => {
               </p>
             )}
 
-            {/* Music Info */}
-            {(currentReel.music_name || currentReel.music_artist) && (
-              <div className="flex items-center gap-2 text-white text-sm">
-                <Music className="w-4 h-4" />
-                <span className="drop-shadow-lg">
-                  {currentReel.music_name}
-                  {currentReel.music_artist && ` - ${currentReel.music_artist}`}
-                </span>
-              </div>
-            )}
+            {/* Original Audio Indicator */}
+            <div className="flex items-center gap-2 text-white/70 text-xs">
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              <span className="drop-shadow-lg">Âm thanh gốc</span>
+            </div>
           </div>
 
           {/* Scroll Hints */}

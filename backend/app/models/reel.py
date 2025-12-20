@@ -20,8 +20,10 @@ class Reel(Document):
     
     # URLs (denormalized from Video for faster access)
     video_url: str  # HLS or direct video URL
+    video_raw_url: Optional[str] = None  # Raw video URL (fallback khi chưa processed)
     thumbnail_url: str
     duration: float  # in seconds
+    video_processed: bool = False  # Flag đánh dấu video đã xử lý xong
     
     # Engagement metrics
     views_count: int = 0
@@ -93,8 +95,10 @@ class ReelPublic(BaseModel):
     user_avatar: Optional[str] = None
     
     video_url: str
+    video_raw_url: Optional[str] = None
     thumbnail_url: str
     duration: float
+    video_processed: bool = False
     
     caption: Optional[str] = None
     music_name: Optional[str] = None

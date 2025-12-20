@@ -82,32 +82,3 @@ jobs:
           sudo nginx -t && sudo systemctl reload nginx
           echo "✅ Nginx updated with Backend IP: $BACKEND_IP"
 
-    # --- Build & Deploy Video Worker ---
-    - name: Build and push Video Worker image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./video-worker
-        push: true
-        tags: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:latest
-          ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:${{ github.sha }}
-
-    - name: Download Worker task definition
-      run: |
-        aws ecs describe-task-definition --task-definition aov-worker-task --query taskDefinition > task-definition-worker.json
-
-    - name: Update Worker task definition
-      id: task-def-worker
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: task-definition-worker.json
-        container-name: aov-worker-task
-        image: ${{ secrets.DOCKERHUB_USERNAME }}/aov-video-worker:${{ github.sha }}
-
-    - name: Deploy Worker to ECS
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-      with:
-        task-definition: ${{ steps.task-def-worker.outputs.task-definition }}
-        service: aov-worker-task-service-leont8u5
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true

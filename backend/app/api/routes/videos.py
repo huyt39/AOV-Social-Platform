@@ -213,6 +213,22 @@ async def video_processed_callback(
                     
         except Exception as e:
             logger.error(f"Failed to update related posts for video {video_id}: {e}")
+        
+        # Update related Reels with processed video URL
+        try:
+            from app.models import Reel
+            reels = await Reel.find(Reel.video_id == video_id).to_list()
+            
+            for reel in reels:
+                reel.video_url = request.play_url
+                reel.thumbnail_url = request.thumbnail_url or reel.thumbnail_url
+                reel.video_processed = True
+                reel.duration = request.duration or reel.duration
+                await reel.save()
+                logger.info(f"Updated Reel {reel.id} with processed video URL")
+                
+        except Exception as e:
+            logger.error(f"Failed to update related reels for video {video_id}: {e}")
 
     else:
         # Mark as failed
