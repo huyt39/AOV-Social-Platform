@@ -3,6 +3,29 @@
 <a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3ATest" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test/badge.svg" alt="Test"></a>
 <a href="https://coverage-badge.samuelcolvin.workers.dev/redirect/fastapi/full-stack-fastapi-template" target="_blank"><img src="https://coverage-badge.samuelcolvin.workers.dev/fastapi/full-stack-fastapi-template.svg" alt="Coverage"></a>
 
+## 🚀 Local Development Quickstart
+
+### 1. Start Docker services
+```bash
+docker compose up -d video-worker rabbitmq redis mongodb
+```
+
+### 2. Start Backend
+```bash
+cd backend
+uv sync
+source .venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 3. Start Frontend (new terminal)
+```bash
+cd frontend
+npm run dev
+```
+
+---
+
 ## Technology Stack and Features
 
 - ⚡ [**FastAPI**](https://fastapi.tiangolo.com) for the Python backend API.

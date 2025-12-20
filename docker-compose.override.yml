@@ -68,6 +68,9 @@ services:
 
   video-worker:
     restart: "no"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
 networks:
   traefik-public:
