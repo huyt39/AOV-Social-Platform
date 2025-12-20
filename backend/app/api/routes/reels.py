@@ -205,6 +205,80 @@ async def get_reel_feed(
     )
 
 
+@router.get("/user/{user_id}", response_model=ReelFeedResponse)
+async def get_user_reels(
+    user_id: str,
+    current_user: CurrentUser,
+    limit: int = Query(default=50, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> Any:
+    """
+    Get all reels created by a specific user.
+    """
+    # Check if user exists
+    target_user = await User.find_one(User.id == user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Query reels by user
+    total_reels = await Reel.find(
+        Reel.user_id == user_id,
+        Reel.is_active == True,
+    ).count()
+    
+    reels = await Reel.find(
+        Reel.user_id == user_id,
+        Reel.is_active == True,
+    ).sort(-Reel.created_at).skip(offset).limit(limit).to_list()
+    
+    # Get like status for current user
+    reel_ids = [reel.id for reel in reels]
+    if reel_ids:
+        likes_query = {
+            "user_id": current_user.id,
+            "reel_id": {"$in": reel_ids}
+        }
+        user_likes = await ReelLike.find(likes_query).to_list()
+        liked_reel_ids = {like.reel_id for like in user_likes}
+    else:
+        liked_reel_ids = set()
+    
+    # Build response
+    reel_publics = []
+    for reel in reels:
+        reel_publics.append(
+            ReelPublic(
+                id=reel.id,
+                user_id=reel.user_id,
+                username=target_user.username,
+                user_avatar=target_user.avatar_url,
+                video_url=reel.video_url,
+                video_raw_url=reel.video_raw_url,
+                thumbnail_url=reel.thumbnail_url,
+                duration=reel.duration,
+                video_processed=reel.video_processed,
+                caption=reel.caption,
+                music_name=reel.music_name,
+                music_artist=reel.music_artist,
+                views_count=reel.views_count,
+                likes_count=reel.likes_count,
+                comments_count=reel.comments_count,
+                shares_count=reel.shares_count,
+                is_liked=reel.id in liked_reel_ids,
+                created_at=reel.created_at,
+            )
+        )
+    
+    has_more = (offset + limit) < total_reels
+    
+    logger.info(f"Returning {len(reel_publics)} reels for user {user_id}")
+    
+    return ReelFeedResponse(
+        reels=reel_publics,
+        has_more=has_more,
+    )
+
+
 @router.post("/{reel_id}/view")
 async def mark_reel_viewed(
     reel_id: str,

@@ -307,7 +307,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
 
     return (
         <>
-            <header className="fixed top-0 left-0 right-0 h-14 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 z-50 px-4">
+            <header className="fixed top-0 left-0 right-0 h-16 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 z-50 px-4">
                 <div className="h-full max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
 
                     {/* Left: Logo */}

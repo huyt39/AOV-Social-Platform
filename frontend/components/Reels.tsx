@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, MoreVertical, AlertCircle, Plus, ChevronUp, ChevronDown, Volume2, VolumeX, PlayCircle } from 'lucide-react';
+import { FiUser } from 'react-icons/fi';
 import { CreateReel } from './CreateReel';
+import { MyReelsPanel } from './MyReelsPanel';
 
 interface ReelData {
   id: string;
@@ -34,6 +36,7 @@ export const Reels: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [hasMore, setHasMore] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showMyReelsPanel, setShowMyReelsPanel] = useState(false);
   const [isMuted, setIsMuted] = useState(true); // Muted by default for autoplay
 
   const videoRefs = useRef<{ [key: number]: HTMLVideoElement | null }>({});
@@ -291,9 +294,21 @@ export const Reels: React.FC = () => {
         />
       )}
 
+      {/* MyReels Panel */}
+      <MyReelsPanel
+        isOpen={showMyReelsPanel}
+        onClose={() => setShowMyReelsPanel(false)}
+        onReelClick={(reelId) => {
+          setShowMyReelsPanel(false);
+          // Navigate to specific reel
+          const reelIndex = reels.findIndex(r => r.id === reelId);
+          if (reelIndex >= 0) setCurrentIndex(reelIndex);
+        }}
+      />
+
       <div
         ref={containerRef}
-        className="h-screen md:h-[calc(100vh-3.5rem)] bg-black overflow-hidden relative"
+        className="h-[calc(100vh-4rem)] md:h-[calc(100vh-3.5rem)] bg-black overflow-hidden relative"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -323,12 +338,12 @@ export const Reels: React.FC = () => {
 
         {/* Overlay Content */}
         <div className="absolute inset-0 pointer-events-none z-20">
-          {/* Create Button (Top Right) */}
+          {/* Profile Button (Top Right) */}
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="absolute top-4 right-4 bg-gradient-to-r from-gold-500 to-amber-500 text-black rounded-full p-3 shadow-lg hover:shadow-gold-500/50 hover:scale-110 transition-all pointer-events-auto group"
+            onClick={() => setShowMyReelsPanel(true)}
+            className="absolute top-4 right-4 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/80 hover:scale-110 transition-all pointer-events-auto"
           >
-            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+            <FiUser className="w-5 h-5 text-white" />
           </button>
 
           {/* Right Side Actions */}

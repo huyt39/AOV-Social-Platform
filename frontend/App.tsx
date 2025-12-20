@@ -106,13 +106,15 @@ const AppContent: React.FC = () => {
 
   // Hide navigation only on auth pages
   const showNavigation = currentRoute !== 'register' && currentRoute !== 'login';
+  // Hide header on reels page
+  const showHeader = showNavigation && currentRoute !== 'reels';
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-amber-500/30">
       {/* Top Header */}
-      {showNavigation && <Header onNavigate={handleTabChange} />}
+      {showHeader && <Header onNavigate={handleTabChange} />}
 
-      <div className={`flex flex-col md:flex-row ${showNavigation ? 'pt-14' : ''}`}>
+      <div className={`flex flex-col md:flex-row ${showHeader ? 'pt-14' : ''}`}>
         {/* Left Sidebar Navigation */}
         {showNavigation && <Navigation activeTab={currentRoute} setActiveTab={handleTabChange} />}
 
