@@ -9,6 +9,7 @@ This package contains all database models and schemas organized by domain:
 - post: Post and feed models
 - comment: Comment models
 - forum: Forum category, thread, and comment models (for forum feature)
+- team: Team/LFG (Looking for Group) models
 """
 
 # Base types and enums
@@ -20,6 +21,8 @@ from .base import (
     Token,
     TokenPayload,
     NewPassword,
+    utc_now,
+    ensure_utc,
 )
 
 # For backward compatibility, expose RoleEnum as alias to GameRoleEnum
@@ -179,6 +182,24 @@ from .conversation import (
     ConversationsResponse,
 )
 
+# Team/LFG models
+from .team import (
+    GameMode,
+    JoinRequestStatus,
+    Team,
+    TeamMember,
+    TeamJoinRequest,
+    TeamOwnerInfo,
+    TeamMemberInfo,
+    TeamCreate,
+    TeamJoinRequestCreate,
+    TeamListItem,
+    TeamDetail,
+    TeamJoinRequestPublic,
+    TeamsResponse,
+    TeamJoinRequestsResponse,
+)
+
 # Define __all__ for explicit exports
 __all__ = [
     # Base
@@ -308,4 +329,21 @@ __all__ = [
     "ConversationListItem",
     "MessagesResponse",
     "ConversationsResponse",
+    # Team/LFG
+    "GameMode",
+    "JoinRequestStatus",
+    "Team",
+    "TeamMember",
+    "TeamJoinRequest",
+    "TeamOwnerInfo",
+    "TeamMemberInfo",
+    "TeamCreate",
+    "TeamJoinRequestCreate",
+    "TeamListItem",
+    "TeamDetail",
+    "TeamJoinRequestPublic",
+    "TeamsResponse",
+    "TeamJoinRequestsResponse",
+    # Utilities
+    "utc_now",
 ]

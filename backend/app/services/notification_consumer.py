@@ -30,6 +30,10 @@ ROUTING_KEY_TO_TYPE = {
     "post.shared": NotificationType.POST_SHARED,
     "comment.mentioned": NotificationType.MENTIONED,
     "comment.replied": NotificationType.REPLY_THREAD,
+    # Team events
+    "team.join_request": NotificationType.TEAM_JOIN_REQUEST,
+    "team.request_approved": NotificationType.TEAM_REQUEST_APPROVED,
+    "team.request_rejected": NotificationType.TEAM_REQUEST_REJECTED,
 }
 
 
@@ -74,6 +78,7 @@ class NotificationConsumer:
             routing_patterns = [
                 "post.*",      # post.liked, post.commented, post.shared
                 "comment.*",   # comment.mentioned, comment.replied
+                "team.*",      # team.join_request, team.request_approved, team.request_rejected
             ]
             for pattern in routing_patterns:
                 await self._queue.bind(exchange, routing_key=pattern)
@@ -129,6 +134,7 @@ class NotificationConsumer:
                 user_id = body.get("user_id")  # Recipient
                 post_id = body.get("post_id")
                 comment_id = body.get("comment_id")
+                team_id = body.get("team_id")
                 
                 if not actor_id or not user_id:
                     logger.warning(f"Missing required fields in event: {body}")
@@ -153,6 +159,7 @@ class NotificationConsumer:
                     type=notification_type,
                     post_id=post_id,
                     comment_id=comment_id,
+                    team_id=team_id,
                     content=content,
                 )
                 await notification.insert()
@@ -195,6 +202,10 @@ class NotificationConsumer:
             NotificationType.POST_SHARED: f"{actor_username} đã chia sẻ bài viết của bạn",
             NotificationType.MENTIONED: f"{actor_username} đã nhắc đến bạn trong một bình luận",
             NotificationType.REPLY_THREAD: f"{actor_username} đã trả lời bình luận của bạn",
+            # Team notifications
+            NotificationType.TEAM_JOIN_REQUEST: f"{actor_username} đã xin tham gia phòng của bạn",
+            NotificationType.TEAM_REQUEST_APPROVED: f"{actor_username} đã chấp nhận bạn vào phòng",
+            NotificationType.TEAM_REQUEST_REJECTED: f"{actor_username} đã từ chối bạn vào phòng",
         }
         return content_map.get(notification_type, f"{actor_username} đã tương tác với bạn")
 

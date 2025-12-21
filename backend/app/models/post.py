@@ -7,7 +7,7 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
-from .base import RankEnum
+from .base import RankEnum, utc_now
 
 
 class MediaType(str, Enum):
@@ -33,8 +33,8 @@ class Post(Document):
     comment_count: int = Field(default=0)
     share_count: int = Field(default=0)
     shared_post_id: Optional[str] = None  
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "posts"
@@ -46,7 +46,7 @@ class PostLike(Document):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     post_id: str
     user_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "post_likes"

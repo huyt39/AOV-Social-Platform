@@ -22,6 +22,7 @@ from app.models import (
     SharedPostInfo,
     User,
     UserPostsResponse,
+    utc_now,
 )
 from app.services.rabbitmq import publish_event, NotificationRoutingKey
 
@@ -339,7 +340,7 @@ async def update_post(
 
     if post_update.content:
         post.content = post_update.content
-        post.updated_at = datetime.utcnow()
+        post.updated_at = utc_now()
         await post.save()
 
     post_public = await enrich_post_with_author(post)

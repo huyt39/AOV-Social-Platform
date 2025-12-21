@@ -184,3 +184,90 @@ export interface ReplyCommentInput {
   content: string;
   mediaUrls?: string[];
 }
+
+// ============== TEAM/LFG TYPES ==============
+
+export enum GameMode {
+  RANKED = 'RANKED',
+  CASUAL = 'CASUAL',
+  CUSTOM = 'CUSTOM'
+}
+
+export enum TeamJoinRequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED'
+}
+
+export interface TeamOwner {
+  id: string;
+  username: string;
+  avatar_url?: string;
+  rank?: string;
+  win_rate?: number;
+}
+
+export interface TeamMemberInfo {
+  id: string;
+  user_id: string;
+  username: string;
+  avatar_url?: string;
+  rank?: string;
+  main_role?: string;
+  win_rate?: number;
+  joined_at: string;
+}
+
+export interface TeamListItem {
+  id: string;
+  name: string;
+  description: string;
+  owner: TeamOwner;
+  rank: string;
+  game_mode: string;
+  max_members: number;
+  current_members: number;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface TeamDetail extends TeamListItem {
+  members: TeamMemberInfo[];
+  is_owner: boolean;
+  is_member: boolean;
+  has_requested: boolean;
+}
+
+export interface TeamJoinRequest {
+  id: string;
+  team_id: string;
+  user: TeamOwner;
+  message?: string;
+  status: string;
+  created_at: string;
+}
+
+export interface TeamsResponse {
+  data: TeamListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
+export interface TeamJoinRequestsResponse {
+  data: TeamJoinRequest[];
+  count: number;
+}
+
+export interface CreateTeamInput {
+  name: string;
+  description: string;
+  game_mode: GameMode;
+  max_members: number;
+}
+
+export interface JoinTeamInput {
+  message?: string;
+}
+

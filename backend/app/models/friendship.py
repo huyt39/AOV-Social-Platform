@@ -7,7 +7,7 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
-from .base import RankEnum
+from .base import RankEnum, utc_now
 
 
 class FriendshipStatus(str, Enum):
@@ -22,8 +22,8 @@ class Friendship(Document):
     requester_id: str  # Người gửi lời mời
     addressee_id: str  # Người nhận lời mời
     status: FriendshipStatus = FriendshipStatus.PENDING
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "friendships"

@@ -28,6 +28,10 @@ class NotificationRoutingKey:
     POST_SHARED = "post.shared"
     COMMENT_MENTIONED = "comment.mentioned"
     COMMENT_REPLIED = "comment.replied"
+    # Team routing keys
+    TEAM_JOIN_REQUEST = "team.join_request"
+    TEAM_REQUEST_APPROVED = "team.request_approved"
+    TEAM_REQUEST_REJECTED = "team.request_rejected"
 
 # Message routing keys
 class MessageRoutingKey:
@@ -199,9 +203,9 @@ async def publish_event(routing_key: str, payload: dict[str, Any]) -> bool:
 
 
 def import_datetime_now():
-    """Helper to get current datetime."""
-    from datetime import datetime
-    return datetime.utcnow().isoformat()
+    """Helper to get current datetime in UTC with timezone info."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 async def publish_message_event(routing_key: str, payload: dict[str, Any]) -> bool:

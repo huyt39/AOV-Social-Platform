@@ -7,7 +7,7 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
-from .base import RankEnum
+from .base import RankEnum, utc_now
 
 
 # ============== FORUM ENUMS ==============
@@ -52,8 +52,8 @@ class ForumCategory(Document):
     is_active: bool = Field(default=True)
     display_order: int = Field(default=0)  # For sorting categories
     created_by_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "forum_categories"
@@ -120,9 +120,9 @@ class ForumThread(Document):
     comment_count: int = Field(default=0)
     like_count: int = Field(default=0)
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_activity_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+    last_activity_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "forum_threads"
@@ -134,7 +134,7 @@ class ForumThreadLike(Document):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     thread_id: str
     user_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "forum_thread_likes"
@@ -234,8 +234,8 @@ class ForumComment(Document):
     # Status
     status: ForumCommentStatus = ForumCommentStatus.ACTIVE
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "forum_comments"
@@ -247,7 +247,7 @@ class ForumCommentLike(Document):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     comment_id: str
     user_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "forum_comment_likes"
@@ -314,7 +314,7 @@ class Report(Document):
     moderator_note: Optional[str] = Field(default=None, max_length=500)
     resolved_at: Optional[datetime] = None
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "reports"

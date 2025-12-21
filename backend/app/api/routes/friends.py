@@ -17,6 +17,7 @@ from app.models import (
     FriendshipStatusResponse,
     FriendsListPublic,
     User,
+    utc_now,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ async def send_friend_request(
             else:
                 # Auto-accept if the other person already sent a request
                 existing.status = FriendshipStatus.ACCEPTED
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = utc_now()
                 await existing.save()
                 return {
                     "success": True,
@@ -70,7 +71,7 @@ async def send_friend_request(
             existing.requester_id = current_user.id
             existing.addressee_id = user_id
             existing.status = FriendshipStatus.PENDING
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = utc_now()
             await existing.save()
             return {
                 "success": True,
@@ -117,7 +118,7 @@ async def respond_to_friend_request(
         raise HTTPException(status_code=400, detail="Lời mời đã được xử lý")
 
     friendship.status = FriendshipStatus.ACCEPTED if response.accept else FriendshipStatus.REJECTED
-    friendship.updated_at = datetime.utcnow()
+    friendship.updated_at = utc_now()
     await friendship.save()
 
     action = "chấp nhận" if response.accept else "từ chối"
