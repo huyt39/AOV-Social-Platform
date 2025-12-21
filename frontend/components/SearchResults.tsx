@@ -41,7 +41,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({ query, onNavigate 
             if (!token) return;
 
             const response = await fetch(
-                `${API_URL}/messages/search/users?q=${encodeURIComponent(q)}&limit=20`,
+                `${API_URL}/search/users?q=${encodeURIComponent(q)}&limit=20`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
 
@@ -111,8 +111,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({ query, onNavigate 
                     <button
                         onClick={() => setActiveTab('users')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all border-b-2 ${activeTab === 'users'
-                                ? 'text-gold-400 border-gold-500 bg-gold-500/5'
-                                : 'text-slate-500 border-transparent hover:text-slate-300 hover:bg-slate-800/50'
+                            ? 'text-gold-400 border-gold-500 bg-gold-500/5'
+                            : 'text-slate-500 border-transparent hover:text-slate-300 hover:bg-slate-800/50'
                             }`}
                     >
                         <UserIcon className="w-4 h-4" />
@@ -121,8 +121,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({ query, onNavigate 
                     <button
                         onClick={() => setActiveTab('groups')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all border-b-2 ${activeTab === 'groups'
-                                ? 'text-gold-400 border-gold-500 bg-gold-500/5'
-                                : 'text-slate-500 border-transparent hover:text-slate-300 hover:bg-slate-800/50'
+                            ? 'text-gold-400 border-gold-500 bg-gold-500/5'
+                            : 'text-slate-500 border-transparent hover:text-slate-300 hover:bg-slate-800/50'
                             }`}
                     >
                         <Users className="w-4 h-4" />
