@@ -15,6 +15,8 @@ from app.models import (
     ConversationPublic,
     ConversationsResponse,
     ConversationType,
+    Friendship,
+    FriendshipStatus,
     Message,
     MessageCreate,
     MessagePublic,
@@ -41,18 +43,44 @@ async def search_users_for_messaging(
 ) -> dict[str, Any]:
     """
     Search users by username to start a conversation.
-    Returns users matching the query (excluding current user).
+    Only returns friends (users with ACCEPTED friendship status).
     """
     import re
+    
+    # First, get all friend IDs for the current user
+    friendships = await Friendship.find(
+        {
+            "$or": [
+                {"requester_id": current_user.id},
+                {"addressee_id": current_user.id},
+            ],
+            "status": FriendshipStatus.ACCEPTED.value,
+        }
+    ).to_list()
+    
+    # Extract friend user IDs
+    friend_ids = []
+    for friendship in friendships:
+        if friendship.requester_id == current_user.id:
+            friend_ids.append(friendship.addressee_id)
+        else:
+            friend_ids.append(friendship.requester_id)
+    
+    # If no friends, return empty list
+    if not friend_ids:
+        return {
+            "success": True,
+            "data": []
+        }
     
     # Case-insensitive regex pattern
     escaped_query = re.escape(q)
     
-    # Use raw MongoDB query for regex
+    # Search only among friends
     users = await User.find(
         {
             "username": {"$regex": escaped_query, "$options": "i"},
-            "id": {"$ne": current_user.id},
+            "id": {"$in": friend_ids},
             "is_active": True,
         }
     ).limit(limit).to_list()
