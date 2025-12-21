@@ -3,12 +3,12 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.security import get_password_hash
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models import (
     ArenaUserRegister,
@@ -364,3 +364,74 @@ async def update_avatar(
         "success": True,
         "avatar_url": current_user.avatar_url,
     }
+
+
+class ProfileUpdate(BaseModel):
+    """Request model for profile update."""
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    main_role: Optional[str] = None
+
+
+@router.patch("/me/profile")
+async def update_profile(
+    profile_data: ProfileUpdate,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Update current user's profile information.
+    
+    Allows updating:
+    - username (must be unique)
+    - main_role (game position)
+    """
+    from app.models.base import GameRoleEnum
+    
+    # Track what was updated
+    updated_fields = []
+    
+    # Update username if provided
+    if profile_data.username and profile_data.username != current_user.username:
+        # Check if username already exists
+        existing_user = await User.find_one(User.username == profile_data.username)
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="Tên người dùng đã tồn tại",
+            )
+        current_user.username = profile_data.username
+        updated_fields.append("username")
+    
+    # Update main_role if provided
+    if profile_data.main_role:
+        try:
+            current_user.main_role = GameRoleEnum(profile_data.main_role)
+            updated_fields.append("main_role")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Vị trí không hợp lệ: {profile_data.main_role}",
+            )
+    
+    if updated_fields:
+        await current_user.save()
+        logger.info(f"User {current_user.id} updated profile: {', '.join(updated_fields)}")
+    
+    return {
+        "success": True,
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "avatar_url": current_user.avatar_url,
+            "rank": current_user.rank.value if current_user.rank else None,
+            "main_role": current_user.main_role.value if current_user.main_role else None,
+            "level": current_user.level,
+            "win_rate": current_user.win_rate,
+            "total_matches": current_user.total_matches,
+            "credibility_score": current_user.credibility_score,
+            "profile_verified": current_user.profile_verified,
+            "role": current_user.role.value if current_user.role else "USER",
+            "is_superuser": current_user.is_superuser,
+        },
+    }
+
