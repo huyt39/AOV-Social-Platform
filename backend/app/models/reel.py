@@ -6,6 +6,8 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
+from .base import utc_now
+
 
 class Reel(Document):
     """Reel document for short-form videos (similar to TikTok/Instagram Reels)."""
@@ -35,8 +37,8 @@ class Reel(Document):
     is_active: bool = True
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
     
     class Settings:
         name = "reels"
@@ -48,7 +50,7 @@ class ReelView(Document):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     user_id: str
     reel_id: str
-    viewed_at: datetime = Field(default_factory=datetime.utcnow)
+    viewed_at: datetime = Field(default_factory=utc_now)
     
     # Engagement
     watched_duration: Optional[float] = None  # seconds watched
@@ -68,7 +70,7 @@ class ReelLike(Document):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     user_id: str
     reel_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     
     class Settings:
         name = "reel_likes"

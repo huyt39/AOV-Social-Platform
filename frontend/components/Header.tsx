@@ -77,6 +77,9 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
     const [showMessages, setShowMessages] = useState(false);
     const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
+    // Search state
+    const [searchValue, setSearchValue] = useState('');
+
     const notificationRef = useRef<HTMLDivElement>(null);
     const profileRef = useRef<HTMLDivElement>(null);
     const allNotificationsRef = useRef<HTMLDivElement>(null);
@@ -325,17 +328,25 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                         </button>
                     </div>
 
-                    {/* Center: Search (placeholder - to be implemented later) */}
+                    {/* Center: Search */}
                     <div className="flex-1 max-w-md hidden md:block">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Tìm kiếm trên ArenaHub"
-                                className="w-full bg-slate-800/50 border border-slate-700 rounded-full py-2 pl-10 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-500/50 focus:bg-slate-800 transition-all"
-                                disabled
-                            />
-                        </div>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            if (searchValue.trim()) {
+                                window.location.hash = `search?q=${encodeURIComponent(searchValue.trim())}`;
+                            }
+                        }}>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchValue}
+                                    onChange={(e) => setSearchValue(e.target.value)}
+                                    placeholder="Tìm kiếm trên ArenaHub"
+                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-full py-2 pl-10 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-500/50 focus:bg-slate-800 transition-all"
+                                />
+                            </div>
+                        </form>
                     </div>
 
                     {/* Right: Icons */}
@@ -343,6 +354,12 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
 
                         {/* Search Icon (Mobile) */}
                         <button
+                            onClick={() => {
+                                const query = prompt('Tìm kiếm:');
+                                if (query?.trim()) {
+                                    window.location.hash = `search?q=${encodeURIComponent(query.trim())}`;
+                                }
+                            }}
                             className="md:hidden p-2.5 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
                             title="Tìm kiếm"
                         >
@@ -556,128 +573,132 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
                         </div>
                     </div>
                 </div>
-            </header>
+            </header >
 
             {/* Post Detail Modal */}
-            {selectedPost && (
-                <PostDetailModal
-                    post={selectedPost}
-                    isOpen={!!selectedPost}
-                    onClose={() => setSelectedPost(null)}
-                    onPostUpdate={(updatedPost) => setSelectedPost(updatedPost)}
-                />
-            )}
+            {
+                selectedPost && (
+                    <PostDetailModal
+                        post={selectedPost}
+                        isOpen={!!selectedPost}
+                        onClose={() => setSelectedPost(null)}
+                        onPostUpdate={(updatedPost) => setSelectedPost(updatedPost)}
+                    />
+                )
+            }
 
             {/* Full Notifications Panel */}
-            {showAllNotifications && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    {/* Backdrop */}
-                    <div
-                        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                        onClick={() => setShowAllNotifications(false)}
-                    />
-
-                    {/* Panel */}
-                    <div className="relative bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[80vh] shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
-                            <h3 className="text-lg font-bold text-white">Tất cả thông báo</h3>
-                            <div className="flex items-center gap-2">
-                                {unreadCount > 0 && (
-                                    <button
-                                        onClick={markAllAsRead}
-                                        className="text-xs text-gold-400 hover:text-gold-300 transition-colors"
-                                    >
-                                        Đánh dấu đã đọc
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setShowAllNotifications(false)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
-                                >
-                                    <X className="w-4 h-4 text-slate-400" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Notifications List with Infinite Scroll */}
+            {
+                showAllNotifications && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                        {/* Backdrop */}
                         <div
-                            ref={allNotificationsRef}
-                            className="flex-1 overflow-y-auto"
-                            onScroll={handleNotificationsScroll}
-                        >
-                            {isLoadingNotifications && allNotifications.length === 0 ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <div className="w-8 h-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin"></div>
-                                </div>
-                            ) : allNotifications.length === 0 ? (
-                                <div className="text-center py-12 text-slate-500">
-                                    <Bell className="w-16 h-16 mx-auto mb-3 opacity-50" />
-                                    <p className="text-sm">Chưa có thông báo nào</p>
-                                </div>
-                            ) : (
-                                <>
-                                    {allNotifications.map((notification) => (
-                                        <div
-                                            key={notification.id}
-                                            onClick={() => {
-                                                setShowAllNotifications(false);
-                                                handleNotificationItemClick(notification);
-                                            }}
-                                            className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-800/50 cursor-pointer transition-colors border-l-2 ${notification.is_read ? 'border-transparent' : 'border-gold-500 bg-gold-500/5'
-                                                }`}
+                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                            onClick={() => setShowAllNotifications(false)}
+                        />
+
+                        {/* Panel */}
+                        <div className="relative bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[80vh] shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 flex-shrink-0">
+                                <h3 className="text-lg font-bold text-white">Tất cả thông báo</h3>
+                                <div className="flex items-center gap-2">
+                                    {unreadCount > 0 && (
+                                        <button
+                                            onClick={markAllAsRead}
+                                            className="text-xs text-gold-400 hover:text-gold-300 transition-colors"
                                         >
-                                            {/* Avatar */}
-                                            <div className="flex-shrink-0">
-                                                {notification.actor.avatar_url ? (
-                                                    <img
-                                                        src={notification.actor.avatar_url}
-                                                        alt=""
-                                                        className="w-12 h-12 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                                                        <UserIcon className="w-6 h-6 text-slate-400" />
-                                                    </div>
+                                            Đánh dấu đã đọc
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setShowAllNotifications(false)}
+                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 transition-colors"
+                                    >
+                                        <X className="w-4 h-4 text-slate-400" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Notifications List with Infinite Scroll */}
+                            <div
+                                ref={allNotificationsRef}
+                                className="flex-1 overflow-y-auto"
+                                onScroll={handleNotificationsScroll}
+                            >
+                                {isLoadingNotifications && allNotifications.length === 0 ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <div className="w-8 h-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                ) : allNotifications.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-500">
+                                        <Bell className="w-16 h-16 mx-auto mb-3 opacity-50" />
+                                        <p className="text-sm">Chưa có thông báo nào</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {allNotifications.map((notification) => (
+                                            <div
+                                                key={notification.id}
+                                                onClick={() => {
+                                                    setShowAllNotifications(false);
+                                                    handleNotificationItemClick(notification);
+                                                }}
+                                                className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-800/50 cursor-pointer transition-colors border-l-2 ${notification.is_read ? 'border-transparent' : 'border-gold-500 bg-gold-500/5'
+                                                    }`}
+                                            >
+                                                {/* Avatar */}
+                                                <div className="flex-shrink-0">
+                                                    {notification.actor.avatar_url ? (
+                                                        <img
+                                                            src={notification.actor.avatar_url}
+                                                            alt=""
+                                                            className="w-12 h-12 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
+                                                            <UserIcon className="w-6 h-6 text-slate-400" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm text-slate-200">
+                                                        {notification.content}
+                                                    </p>
+                                                    <span className="text-xs text-slate-500 mt-1 block">
+                                                        {formatTimeAgo(notification.created_at)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Unread dot */}
+                                                {!notification.is_read && (
+                                                    <div className="w-3 h-3 rounded-full bg-gold-500 flex-shrink-0 mt-1.5"></div>
                                                 )}
                                             </div>
+                                        ))}
 
-                                            {/* Content */}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm text-slate-200">
-                                                    {notification.content}
-                                                </p>
-                                                <span className="text-xs text-slate-500 mt-1 block">
-                                                    {formatTimeAgo(notification.created_at)}
-                                                </span>
+                                        {/* Loading more indicator */}
+                                        {isLoadingMore && (
+                                            <div className="flex items-center justify-center py-4">
+                                                <div className="w-6 h-6 border-2 border-gold-500 border-t-transparent rounded-full animate-spin"></div>
                                             </div>
+                                        )}
 
-                                            {/* Unread dot */}
-                                            {!notification.is_read && (
-                                                <div className="w-3 h-3 rounded-full bg-gold-500 flex-shrink-0 mt-1.5"></div>
-                                            )}
-                                        </div>
-                                    ))}
-
-                                    {/* Loading more indicator */}
-                                    {isLoadingMore && (
-                                        <div className="flex items-center justify-center py-4">
-                                            <div className="w-6 h-6 border-2 border-gold-500 border-t-transparent rounded-full animate-spin"></div>
-                                        </div>
-                                    )}
-
-                                    {/* End of list */}
-                                    {!hasMore && allNotifications.length > 0 && (
-                                        <div className="text-center py-4 text-slate-600 text-xs">
-                                            Đã hiển thị tất cả thông báo
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                                        {/* End of list */}
+                                        {!hasMore && allNotifications.length > 0 && (
+                                            <div className="text-center py-4 text-slate-600 text-xs">
+                                                Đã hiển thị tất cả thông báo
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Messages Panel */}
             <Messages

@@ -13,15 +13,17 @@ import { ForumCategoryPage } from './components/ForumCategory';
 import { ForumThreadPage } from './components/ForumThread';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Reels } from './components/Reels';
+import { SearchResults } from './components/SearchResults';
 import { AuthProvider, useAuth } from './contexts/authContext';
 
-type Route = 'feed' | 'reels' | 'lfg' | 'friends' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin';
+type Route = 'feed' | 'reels' | 'lfg' | 'friends' | 'profile' | 'settings' | 'register' | 'login' | 'forum' | 'forum-category' | 'forum-thread' | 'admin' | 'search';
 
 const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<Route>('feed');
   const [profileUserId, setProfileUserId] = useState<string | undefined>(undefined);
   const [forumCategoryId, setForumCategoryId] = useState<string | undefined>(undefined);
   const [forumThreadId, setForumThreadId] = useState<string | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const { isLoading, isAuthenticated } = useAuth();
 
   // Simple hash-based routing
@@ -47,10 +49,18 @@ const AppContent: React.FC = () => {
         setForumThreadId(threadId);
         setCurrentRoute('forum-thread');
       }
+      // Check for search?q= pattern
+      else if (hash.startsWith('search?q=') || hash.startsWith('search?')) {
+        const params = new URLSearchParams(hash.replace('search?', ''));
+        const q = params.get('q') || '';
+        setSearchQuery(q);
+        setCurrentRoute('search');
+      }
       else {
         setProfileUserId(undefined);
         setForumCategoryId(undefined);
         setForumThreadId(undefined);
+        setSearchQuery('');
         setCurrentRoute(hash as Route);
       }
     };
@@ -100,6 +110,7 @@ const AppContent: React.FC = () => {
       case 'forum-category': return <ForumCategoryPage categoryId={forumCategoryId || ''} />;
       case 'forum-thread': return <ForumThreadPage threadId={forumThreadId || ''} />;
       case 'admin': return <AdminDashboard />;
+      case 'search': return <SearchResults query={searchQuery} onNavigate={handleTabChange} />;
       default: return <Feed />;
     }
   };

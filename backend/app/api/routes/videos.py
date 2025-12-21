@@ -19,7 +19,8 @@ from app.models import (
     Video, VideoStatus,
     VideoUploadRequest, VideoUploadResponse,
     VideoCompleteRequest, VideoProcessedRequest,
-    VideoPublic
+    VideoPublic,
+    utc_now,
 )
 from app.services.clawcloud_s3 import clawcloud_s3
 from app.services.rabbitmq import rabbitmq_service
@@ -127,7 +128,7 @@ async def complete_video_upload(
     
     # Update status
     video.status = VideoStatus.PROCESSING
-    video.uploaded_at = datetime.utcnow()
+    video.uploaded_at = utc_now()
     await video.save()
     logger.info(f"📝 [Complete] Updated video status to PROCESSING")
     
@@ -182,7 +183,7 @@ async def video_processed_callback(
         video.resolutions = request.resolutions
         video.play_url = request.play_url
         video.thumbnail_url = request.thumbnail_url
-        video.processed_at = datetime.utcnow()
+        video.processed_at = utc_now()
         
         logger.info(f"Video {video_id} processing completed successfully")
         

@@ -7,6 +7,8 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
+from .base import utc_now
+
 
 class VideoStatus(str, Enum):
     """Video processing status."""
@@ -34,7 +36,7 @@ class Video(Document):
     error_message: Optional[str] = None
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     uploaded_at: Optional[datetime] = None
     processed_at: Optional[datetime] = None
     

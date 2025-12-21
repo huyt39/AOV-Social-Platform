@@ -21,6 +21,7 @@ from app.models import (
     ParticipantInfo,
     ParticipantRole,
     User,
+    utc_now,
 )
 
 logger = logging.getLogger(__name__)
@@ -213,7 +214,7 @@ class MessageService:
             if existing.left_at is not None:
                 # Rejoin
                 existing.left_at = None
-                existing.joined_at = datetime.utcnow()
+                existing.joined_at = utc_now()
                 existing.role = role
                 await existing.save()
                 return existing
@@ -242,7 +243,7 @@ class MessageService:
         if not participant:
             return False
         
-        participant.left_at = datetime.utcnow()
+        participant.left_at = utc_now()
         await participant.save()
         return True
 

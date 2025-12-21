@@ -9,7 +9,8 @@ from app.models import (
     ForumCategory, ForumThread, ForumThreadLike, 
     ForumComment, ForumCommentLike, Report, Video, Notification,
     Conversation, ConversationParticipant, Message,
-    Reel, ReelView, ReelLike
+    Reel, ReelView, ReelLike,
+    Team, TeamMember, TeamJoinRequest
 )
 
 # Global MongoDB client
@@ -40,7 +41,8 @@ async def connect_to_mongodb() -> None:
             ForumCategory, ForumThread, ForumThreadLike, 
             ForumComment, ForumCommentLike, Report, Video, Notification,
             Conversation, ConversationParticipant, Message,
-            Reel, ReelView, ReelLike
+            Reel, ReelView, ReelLike,
+            Team, TeamMember, TeamJoinRequest
         ],
     )
 

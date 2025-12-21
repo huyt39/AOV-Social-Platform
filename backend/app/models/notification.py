@@ -7,6 +7,8 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
+from .base import utc_now
+
 
 class NotificationType(str, Enum):
     """Types of notifications supported."""
@@ -15,6 +17,10 @@ class NotificationType(str, Enum):
     MENTIONED = "mentioned"
     REPLY_THREAD = "reply_thread"
     POST_SHARED = "post_shared"
+    # Team notifications
+    TEAM_JOIN_REQUEST = "team_join_request"  # Someone requested to join your team
+    TEAM_REQUEST_APPROVED = "team_request_approved"  # Your request was approved
+    TEAM_REQUEST_REJECTED = "team_request_rejected"  # Your request was rejected
 
 
 class Notification(Document):
@@ -25,9 +31,10 @@ class Notification(Document):
     type: NotificationType
     post_id: Optional[str] = None  # Related post (if applicable)
     comment_id: Optional[str] = None  # Related comment (if applicable)
+    team_id: Optional[str] = None  # Related team (if applicable)
     content: str  # Preview text for the notification
     is_read: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "notifications"

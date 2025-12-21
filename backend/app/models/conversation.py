@@ -8,6 +8,8 @@ from typing import Optional
 from beanie import Document
 from pydantic import BaseModel, Field
 
+from .base import utc_now
+
 
 # ============== Enums ==============
 
@@ -60,8 +62,8 @@ class Conversation(Document):
     name: Optional[str] = None  # For group chats
     avatar_url: Optional[str] = None  # Group avatar
     created_by: Optional[str] = None  # User ID who created (for groups)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)  # Last activity
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)  # Last activity
     last_message_id: Optional[str] = None  # For quick preview
     last_message_content: Optional[str] = None  # Preview text
     last_message_at: Optional[datetime] = None
@@ -84,7 +86,7 @@ class ConversationParticipant(Document):
     last_seen_message_id: Optional[str] = None
     unread_count: int = 0
     muted: bool = False
-    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    joined_at: datetime = Field(default_factory=utc_now)
     left_at: Optional[datetime] = None  # Null if still in conversation
 
     class Settings:
@@ -107,7 +109,7 @@ class Message(Document):
     media: list[MediaAttachment] = Field(default_factory=list)
     status: MessageStatus = MessageStatus.SENT
     reply_to_message_id: Optional[str] = None  # For reply threads
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     updated_at: Optional[datetime] = None  # For edited messages
     deleted_at: Optional[datetime] = None  # Soft delete
 
