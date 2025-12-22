@@ -74,6 +74,13 @@ class PostAuthor(BaseModel):
     level: Optional[int] = None
 
 
+class RecentLiker(BaseModel):
+    """Simplified user info for recent likers display."""
+    id: str
+    username: str
+    avatar_url: Optional[str] = None
+
+
 class SharedPostInfo(BaseModel):
     """Info about the original shared post."""
     id: str
@@ -94,7 +101,8 @@ class PostPublic(BaseModel):
     comment_count: int = 0
     share_count: int = 0
     is_liked: bool = False  
-    shared_post: Optional[SharedPostInfo] = None  
+    shared_post: Optional[SharedPostInfo] = None
+    recent_likers: list[RecentLiker] = []  # First 3 users who liked
     created_at: datetime
 
 

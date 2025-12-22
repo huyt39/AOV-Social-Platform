@@ -19,6 +19,7 @@ from app.models import (
     PostLike,
     PostPublic,
     PostUpdate,
+    RecentLiker,
     SharedPostInfo,
     User,
     UserPostsResponse,
@@ -52,7 +53,7 @@ async def get_friend_ids(user_id: str) -> list[str]:
 
 
 async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = None) -> PostPublic:
-    """Add author information, like status, and shared post info to a post."""
+    """Add author information, like status, recent likers, and shared post info to a post."""
     author = await User.find_one(User.id == post.author_id)
     
     if not author:
@@ -77,6 +78,22 @@ async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = N
             PostLike.user_id == current_user_id
         )
         is_liked = like is not None
+    
+    # Fetch recent likers (first 3 users who liked this post)
+    recent_likers: list[RecentLiker] = []
+    if post.like_count > 0:
+        recent_likes = await PostLike.find(
+            PostLike.post_id == post.id
+        ).sort(-PostLike.created_at).limit(3).to_list()
+        
+        for like in recent_likes:
+            liker = await User.find_one(User.id == like.user_id)
+            if liker:
+                recent_likers.append(RecentLiker(
+                    id=liker.id,
+                    username=liker.username,
+                    avatar_url=liker.avatar_url,
+                ))
     
     # Fetch shared post info if this is a share
     shared_post_info = None
@@ -110,6 +127,7 @@ async def enrich_post_with_author(post: Post, current_user_id: Optional[str] = N
         share_count=post.share_count,
         is_liked=is_liked,
         shared_post=shared_post_info,
+        recent_likers=recent_likers,
         created_at=post.created_at,
     )
 
@@ -480,4 +498,62 @@ async def unlike_post(
         "message": "Đã bỏ thích bài viết",
         "like_count": post.like_count,
         "is_liked": False,
+    }
+
+
+@router.get("/{post_id}/likes")
+async def get_post_likes(
+    post_id: str,
+    current_user: CurrentUser,
+    cursor: Optional[str] = Query(default=None, description="Cursor for pagination"),
+    limit: int = Query(default=20, ge=1, le=50, description="Number of users per page"),
+) -> dict[str, Any]:
+    """
+    Get list of users who liked a post with cursor pagination.
+    """
+    post = await Post.find_one(Post.id == post_id)
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+
+    # Build query for likes
+    if cursor:
+        try:
+            cursor_dt = datetime.fromisoformat(cursor.replace("Z", "+00:00"))
+            likes = await PostLike.find(
+                PostLike.post_id == post_id,
+                PostLike.created_at < cursor_dt
+            ).sort(-PostLike.created_at).limit(limit + 1).to_list()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid cursor format")
+    else:
+        likes = await PostLike.find(
+            PostLike.post_id == post_id
+        ).sort(-PostLike.created_at).limit(limit + 1).to_list()
+
+    has_more = len(likes) > limit
+    if has_more:
+        likes = likes[:limit]
+
+    next_cursor = likes[-1].created_at.isoformat() if has_more and likes else None
+
+    # Get user info for each like
+    users = []
+    for like in likes:
+        user = await User.find_one(User.id == like.user_id)
+        if user:
+            users.append({
+                "id": user.id,
+                "username": user.username,
+                "avatar_url": user.avatar_url,
+                "rank": user.rank,
+                "level": user.level,
+            })
+
+    return {
+        "success": True,
+        "data": users,
+        "total_count": post.like_count,
+        "next_cursor": next_cursor,
+        "has_more": has_more,
     }

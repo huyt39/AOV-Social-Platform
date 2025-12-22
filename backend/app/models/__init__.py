@@ -73,6 +73,7 @@ from .post import (
     PostCreate,
     PostUpdate,
     PostAuthor,
+    RecentLiker,
     SharedPostInfo,
     PostPublic,
     FeedResponse,
