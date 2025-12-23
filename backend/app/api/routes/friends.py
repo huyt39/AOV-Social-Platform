@@ -19,6 +19,7 @@ from app.models import (
     User,
     utc_now,
 )
+from app.services.redis_client import redis_service
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,57 @@ async def get_user_friend_count(
     return {
         "success": True,
         "count": count,
+    }
+
+
+@router.get("/online")
+async def get_online_friends(
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Get list of friends who are currently online.
+    Checks Redis for active WebSocket connections.
+    """
+    # Find all accepted friendships
+    friendships = await Friendship.find(
+        Friendship.status == FriendshipStatus.ACCEPTED,
+        Or(
+            Friendship.requester_id == current_user.id,
+            Friendship.addressee_id == current_user.id,
+        ),
+    ).to_list()
+
+    # Get friend IDs
+    friend_ids = []
+    for f in friendships:
+        if f.requester_id == current_user.id:
+            friend_ids.append(f.addressee_id)
+        else:
+            friend_ids.append(f.requester_id)
+
+    # Check which friends are online
+    online_friends = []
+    for friend_id in friend_ids:
+        try:
+            is_online = await redis_service.is_user_online(friend_id)
+            if is_online:
+                user = await User.find_one(User.id == friend_id)
+                if user:
+                    online_friends.append({
+                        "id": user.id,
+                        "username": user.username,
+                        "avatar_url": user.avatar_url,
+                        "rank": user.rank.value if user.rank else None,
+                        "level": user.level,
+                    })
+        except Exception as e:
+            logger.warning(f"Failed to check online status for {friend_id}: {e}")
+            continue
+
+    return {
+        "success": True,
+        "data": online_friends,
+        "count": len(online_friends),
     }
 
 

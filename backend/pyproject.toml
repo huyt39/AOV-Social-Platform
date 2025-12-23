@@ -32,6 +32,7 @@ dependencies = [
     "redis>=5.0.0",
     "websockets>=15.0.1",
     "certifi>=2024.8.30",
+    "numpy>=2.2.6",
 ]
 
 [tool.uv]

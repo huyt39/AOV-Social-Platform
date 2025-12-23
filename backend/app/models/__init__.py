@@ -25,6 +25,26 @@ from .base import (
     ensure_utc,
 )
 
+# Champion models
+from .champion import (
+    ChampionBase,
+    Champion,
+    ChampionPublic,
+    ChampionsPublic,
+)
+
+# Chatbot models
+from .chatbot import (
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    ChampionSuggestion,
+    ChatbotConversation,
+    ConversationMessage,
+    ConversationPublic,
+)
+
+
 # For backward compatibility, expose RoleEnum as alias to GameRoleEnum
 RoleEnum = GameRoleEnum
 
