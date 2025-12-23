@@ -2,9 +2,8 @@
 import logging
 from typing import Any, Optional
 
-import numpy as np
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.core.config import settings
 from app.models import (
@@ -57,18 +56,12 @@ class ChatbotService:
         if not settings.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set in environment variables")
 
-        # Initialize LLM
+        # Initialize LLM - using stable model to avoid rate limits
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-exp",
+            model="gemini-flash-latest",  # Stable model with better rate limits
             google_api_key=settings.GEMINI_API_KEY,
             temperature=0.7,
             max_retries=2,
-        )
-
-        # Initialize embeddings
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=settings.GEMINI_API_KEY,
         )
 
         # Create prompt template
@@ -77,27 +70,9 @@ class ChatbotService:
             ("user", CHATBOT_USER_TEMPLATE),
         ])
 
-        # Cache for champion embeddings
-        self._champion_embeddings_cache: dict[str, list[float]] = {}
-
         logger.info("ChatbotService initialized")
 
-    async def _get_champion_embedding(self, champion: Champion) -> list[float]:
-        """Get embedding for a champion."""
-        # Check cache
-        if champion.id in self._champion_embeddings_cache:
-            return self._champion_embeddings_cache[champion.id]
 
-        # Create text representation for embedding
-        text = f"{champion.ten_tuong} {champion.vi_tri} {champion.cach_danh} {champion.dac_diem or ''} {champion.diem_manh or ''}"
-        
-        # Generate embedding
-        embedding = await self.embeddings.aembed_query(text)
-        
-        # Cache it
-        self._champion_embeddings_cache[champion.id] = embedding
-        
-        return embedding
 
     async def _retrieve_relevant_champions(
         self,
@@ -105,7 +80,7 @@ class ChatbotService:
         query: str,
         top_k: int = 5,
     ) -> list[Champion]:
-        """Retrieve relevant champions using RAG."""
+        """Retrieve relevant champions using rule-based scoring."""
         # Get all champions
         all_champions = await Champion.find_all().to_list()
         
@@ -113,9 +88,8 @@ class ChatbotService:
             logger.warning("No champions found in database")
             return []
 
-        # Generate query embedding
-        query_embedding = await self.embeddings.aembed_query(query)
-        query_vector = np.array(query_embedding)
+        # Normalize query for keyword matching
+        query_lower = query.lower()
 
         # Calculate scores for each champion
         scored_champions: list[tuple[Champion, float]] = []
@@ -123,17 +97,18 @@ class ChatbotService:
         for champion in all_champions:
             score = 0.0
             
-            # 1. Semantic similarity (50% weight)
-            champ_embedding = await self._get_champion_embedding(champion)
-            champ_vector = np.array(champ_embedding)
-            cosine_sim = np.dot(query_vector, champ_vector) / (
-                np.linalg.norm(query_vector) * np.linalg.norm(champ_vector)
-            )
-            score += cosine_sim * 0.5
+            # 1. Keyword matching (40% weight)
+            # Check if champion name or related terms are in query
+            if champion.ten_tuong.lower() in query_lower:
+                score += 0.4
+            elif champion.vi_tri.lower() in query_lower:
+                score += 0.2
+            elif champion.cach_danh.lower() in query_lower:
+                score += 0.15
 
-            # 2. Lane/Role match (30% weight)
+            # 2. Lane/Role match (40% weight)
             if user.main_role and champion.lane == user.main_role:
-                score += 0.3
+                score += 0.4
 
             # 3. Rank compatibility (20% weight)
             if user.rank:
@@ -164,18 +139,11 @@ class ChatbotService:
 
         context_parts = []
         for i, champ in enumerate(champions, 1):
-            context = f"""
-{i}. {champ.ten_tuong}
-   - Vị trí: {champ.vi_tri}
-   - Cách đánh: {champ.cach_danh}
-   - Độ khó: {champ.do_kho}
-   - Rank phù hợp: {champ.rank_phu_hop}
-   - Đặc điểm: {champ.dac_diem or 'N/A'}
-   - Điểm mạnh: {champ.diem_manh or 'N/A'}
-   - Kỹ năng chính: {champ.ky_nang_chinh[:200]}...
-   - Build: {champ.build_info[:200]}...
-   - Cách chơi: {champ.cach_choi[:300]}...
-""".strip()
+            # Shortened context to reduce tokens
+            context = f"""{i}. {champ.ten_tuong} - {champ.vi_tri} ({champ.cach_danh})
+   Độ khó: {champ.do_kho} | Rank: {champ.rank_phu_hop}
+   Đặc điểm: {champ.dac_diem or 'N/A'}
+   Điểm mạnh: {champ.diem_manh[:100] if champ.diem_manh else 'N/A'}...""".strip()
             context_parts.append(context)
 
         return "\n\n".join(context_parts)
@@ -268,7 +236,15 @@ class ChatbotService:
                 "history": history,
             })
 
-            response_text = response.content
+            # Extract text from response (handle both string and list)
+            if isinstance(response.content, list):
+                # If content is a list, join all text parts
+                response_text = " ".join(
+                    part.get("text", str(part)) if isinstance(part, dict) else str(part)
+                    for part in response.content
+                )
+            else:
+                response_text = str(response.content)
 
             # 6. Parse suggestions
             suggestions = await self._parse_response_for_suggestions(

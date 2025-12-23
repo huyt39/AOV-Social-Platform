@@ -26,6 +26,7 @@ async def chat(
     - Semantic similarity with the query
     - Champion difficulty matching user's rank
     """
+    logger.info(f"Chatbot request from user: {current_user.id}, message: {request.message[:50]}")
     try:
         response = await chatbot_service.chat(user=current_user, request=request)
         return response

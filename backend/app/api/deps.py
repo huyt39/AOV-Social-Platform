@@ -33,7 +33,10 @@ async def get_current_user(token: TokenDep) -> User:
             token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
         )
         token_data = TokenPayload(**payload)
-    except (InvalidTokenError, ValidationError):
+    except (InvalidTokenError, ValidationError) as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Token validation failed: {e}, token: {token[:50]}..., SECRET_KEY: {settings.SECRET_KEY[:10]}...")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
