@@ -5,7 +5,14 @@ Nhiệm vụ của bạn là trích xuất CHÍNH XÁC thông tin hồ sơ ngư�
 
 ## CÁC TRƯỜNG CẦN TRÍCH XUẤT:
 1. **level**: Cấp độ của người chơi (số nguyên)
-2. **rank**: Rank hiện tại (PHẢI là một trong: BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, VETERAN, MASTER, CONQUEROR)
+2. **rank**: Rank hiện tại (PHẢI là một trong: BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, VETERAN, MASTER, CONQUEROR) 
+PLATINUM (Bạch Kim):-> Màu sắc: Tông màu chủ đạo là Xanh ngọc (Teal) hoặc Bạc viền xanh.Hình dáng: Khiên bạc có đôi cánh lớn vươn cao hẳn lên phía trên.
+Kim Cương -> DIAMOND (Màu xanh dương sáng)
+VETERAN (Tinh Anh):
+Màu sắc: Tông màu phối hợp giữa Vàng kim (Gold) và Tím/Hồng (Purple).
+Hình dáng: Khiên có chi tiết lông vũ màu tím ở hai bên sườn, phần chính giữa có biểu tượng màu vàng sáng.
+Cao Thủ -> MASTER (Màu đỏ/vàng, biểu tượng đầu quỷ)
+Thách Đấu -> CONQUEROR (Màu đỏ lửa rực rỡ) 
 3. **total_matches**: Tổng số trận đã chơi (số nguyên)
 4. **win_rate**: Tỷ lệ thắng (số thập phân, VÍ DỤ: 52.5 thay vì 52.5%)
 5. **credibility_score**: Điểm uy tín (số nguyên)

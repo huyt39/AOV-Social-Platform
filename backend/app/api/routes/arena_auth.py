@@ -374,6 +374,13 @@ class ProfileUpdate(BaseModel):
     """Request model for profile update."""
     username: Optional[str] = Field(default=None, min_length=3, max_length=50)
     main_role: Optional[str] = None
+    # Game stats from verified screenshot
+    level: Optional[int] = None
+    rank: Optional[str] = None
+    win_rate: Optional[float] = None
+    total_matches: Optional[int] = None
+    credibility_score: Optional[int] = None
+    profile_screenshot_url: Optional[str] = None
 
 
 @router.patch("/me/profile")
@@ -387,8 +394,9 @@ async def update_profile(
     Allows updating:
     - username (must be unique)
     - main_role (game position)
+    - game stats from verified screenshot (level, rank, win_rate, etc.)
     """
-    from app.models.base import GameRoleEnum
+    from app.models.base import GameRoleEnum, RankEnum
     
     # Track what was updated
     updated_fields = []
@@ -415,6 +423,39 @@ async def update_profile(
                 status_code=400,
                 detail=f"Vị trí không hợp lệ: {profile_data.main_role}",
             )
+    
+    # Update game stats from verified screenshot if provided
+    if profile_data.level is not None:
+        current_user.level = profile_data.level
+        updated_fields.append("level")
+    
+    if profile_data.rank:
+        try:
+            current_user.rank = RankEnum(profile_data.rank)
+            updated_fields.append("rank")
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rank không hợp lệ: {profile_data.rank}",
+            )
+    
+    if profile_data.win_rate is not None:
+        current_user.win_rate = profile_data.win_rate
+        updated_fields.append("win_rate")
+    
+    if profile_data.total_matches is not None:
+        current_user.total_matches = profile_data.total_matches
+        updated_fields.append("total_matches")
+    
+    if profile_data.credibility_score is not None:
+        current_user.credibility_score = profile_data.credibility_score
+        updated_fields.append("credibility_score")
+    
+    if profile_data.profile_screenshot_url:
+        current_user.profile_screenshot_url = profile_data.profile_screenshot_url
+        current_user.profile_verified = True
+        current_user.profile_verified_at = datetime.now(timezone.utc)
+        updated_fields.append("profile_screenshot_url")
     
     if updated_fields:
         await current_user.save()
