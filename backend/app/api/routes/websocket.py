@@ -36,6 +36,8 @@ class ConnectionManager:
         self.active_connections: dict[str, set[WebSocket]] = {}
         # Map socket_id -> (user_id, websocket)
         self.socket_info: dict[str, tuple[str, WebSocket]] = {}
+        # Track closed sockets to prevent sending after close
+        self.closed_sockets: set[str] = set()
     
     async def connect(self, websocket: WebSocket, user_id: str) -> str:
         """Accept connection and register in Redis."""
@@ -61,6 +63,9 @@ class ConnectionManager:
     
     async def disconnect(self, websocket: WebSocket, user_id: str, socket_id: str):
         """Remove connection from tracking and Redis."""
+        # Mark as closed first to prevent further sends
+        self.closed_sockets.add(socket_id)
+        
         # Remove from local tracking
         if user_id in self.active_connections:
             self.active_connections[user_id].discard(websocket)
@@ -78,12 +83,22 @@ class ConnectionManager:
         
         logger.info(f"WebSocket disconnected: user={user_id}, socket={socket_id}")
     
-    async def send_message(self, websocket: WebSocket, data: dict):
+    def is_socket_active(self, socket_id: str) -> bool:
+        """Check if socket is still active."""
+        return socket_id in self.socket_info and socket_id not in self.closed_sockets
+    
+    async def send_message(self, websocket: WebSocket, data: dict, socket_id: str = None):
         """Send message to a specific WebSocket."""
+        # Check if socket is closed
+        if socket_id and socket_id in self.closed_sockets:
+            return  # Silently skip - socket is closed
+        
         try:
             await websocket.send_json(data)
         except Exception as e:
-            logger.error(f"Failed to send message via WebSocket: {e}")
+            # Only log if it's not a known closed socket
+            if socket_id and socket_id not in self.closed_sockets:
+                logger.debug(f"Failed to send message via WebSocket: {e}")
 
 
 # Global connection manager
@@ -248,11 +263,13 @@ async def websocket_endpoint(
     try:
         # Callback for notifications
         async def notification_callback(data: dict):
-            await manager.send_message(websocket, data)
+            if manager.is_socket_active(socket_id):
+                await manager.send_message(websocket, data, socket_id)
         
         # Callback for messages
         async def message_callback(data: dict):
-            await manager.send_message(websocket, data)
+            if manager.is_socket_active(socket_id):
+                await manager.send_message(websocket, data, socket_id)
         
         # Subscribe to notification channel
         notification_pubsub = await redis_service.subscribe_user_notifications(
@@ -272,8 +289,17 @@ async def websocket_endpoint(
             base_delay = 1  # seconds
             
             while retry_count < max_retries:
+                # Exit if socket is no longer active
+                if not manager.is_socket_active(socket_id):
+                    logger.debug(f"Message listener stopping - socket {socket_id} is no longer active")
+                    return
+                
                 try:
                     async for msg in message_pubsub.listen():
+                        # Check socket still active before processing
+                        if not manager.is_socket_active(socket_id):
+                            return
+                        
                         # Reset retry count on successful message
                         retry_count = 0
                         if msg["type"] == "message":
@@ -286,6 +312,10 @@ async def websocket_endpoint(
                     logger.debug(f"Message listener cancelled for user {user_id}")
                     return
                 except Exception as e:
+                    # Exit if socket is no longer active
+                    if not manager.is_socket_active(socket_id):
+                        return
+                    
                     retry_count += 1
                     delay = min(base_delay * (2 ** retry_count), 30)  # Max 30 seconds
                     logger.warning(

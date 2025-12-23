@@ -39,6 +39,7 @@ class Team(Document):
     max_members: int = Field(default=5, ge=2, le=5)
     current_members: int = Field(default=1, ge=1)  # Includes owner
     is_active: bool = True
+    conversation_id: Optional[str] = None  # Group chat conversation for team members
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     expires_at: datetime = Field(default_factory=lambda: utc_now() + timedelta(hours=1))
@@ -164,6 +165,7 @@ class TeamDetail(TeamListItem):
     is_owner: bool = False
     is_member: bool = False  # True if current user is a member (including owner)
     has_requested: bool = False
+    conversation_id: Optional[str] = None  # Group chat conversation ID
 
 
 class TeamJoinRequestPublic(BaseModel):

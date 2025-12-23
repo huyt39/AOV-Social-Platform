@@ -28,7 +28,11 @@ from app.models import (
     TeamJoinRequestsResponse,
     utc_now,
     ensure_utc,
+    ConversationCreate,
+    ConversationType,
+    ParticipantRole,
 )
+from app.services.message_service import message_service
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +92,53 @@ async def build_team_list_item(team: Team) -> TeamListItem:
     )
 
 
+async def ensure_team_conversation(team: Team) -> str:
+    """Ensure team has a conversation, create if needed. Returns conversation_id."""
+    from app.models import Conversation
+    
+    if team.conversation_id:
+        # Ensure conversation has team_id set (for legacy conversations)
+        conv_doc = await Conversation.get(team.conversation_id)
+        if conv_doc and not conv_doc.team_id:
+            conv_doc.team_id = team.id
+            await conv_doc.save()
+            logger.info(f"Updated conversation {conv_doc.id} with team_id {team.id}")
+        return team.conversation_id
+    
+    # Create new conversation
+    conversation = await message_service.create_conversation(
+        creator_id=team.owner_id,
+        data=ConversationCreate(
+            type=ConversationType.GROUP,
+            name=f"Phòng: {team.name}",
+            participant_ids=[],
+        ),
+    )
+    
+    # Mark as team chat
+    conv_doc = await Conversation.get(conversation.id)
+    if conv_doc:
+        conv_doc.team_id = team.id
+        await conv_doc.save()
+    
+    # Add all current members to conversation
+    members = await TeamMember.find(TeamMember.team_id == team.id).to_list()
+    for m in members:
+        if m.user_id != team.owner_id:  # Owner already added
+            await message_service.add_participant(
+                conversation_id=conversation.id,
+                user_id=m.user_id,
+                role=ParticipantRole.MEMBER,
+            )
+    
+    # Update team
+    team.conversation_id = conversation.id
+    await team.save()
+    
+    logger.info(f"Auto-created conversation {conversation.id} for team {team.id}")
+    return conversation.id
+
+
 # ============== ENDPOINTS ==============
 
 @router.get("", response_model=TeamsResponse)
@@ -145,6 +196,7 @@ async def create_team(
     """
     Create a new team. User becomes the owner.
     Only one active team per user allowed.
+    Automatically creates a group chat for team members.
     """
     now = utc_now()
     
@@ -160,7 +212,7 @@ async def create_team(
             detail="You already have an active team. Please close it before creating a new one.",
         )
     
-    # Create team with owner's rank
+    # Create team first to get ID
     team = Team(
         owner_id=current_user.id,
         name=team_data.name,
@@ -172,6 +224,27 @@ async def create_team(
     )
     await team.insert()
     
+    # Create group conversation for team chat
+    conversation = await message_service.create_conversation(
+        creator_id=current_user.id,
+        data=ConversationCreate(
+            type=ConversationType.GROUP,
+            name=f"Phòng: {team_data.name}",
+            participant_ids=[],  # Owner will be added automatically
+        ),
+    )
+    
+    # Mark conversation as team chat (so it won't show in regular chat list)
+    from app.models import Conversation
+    conv_doc = await Conversation.get(conversation.id)
+    if conv_doc:
+        conv_doc.team_id = team.id
+        await conv_doc.save()
+    
+    # Update team with conversation_id
+    team.conversation_id = conversation.id
+    await team.save()
+    
     # Add owner as first member
     owner_member = TeamMember(
         team_id=team.id,
@@ -179,7 +252,7 @@ async def create_team(
     )
     await owner_member.insert()
     
-    logger.info(f"User {current_user.id} created team {team.id}")
+    logger.info(f"User {current_user.id} created team {team.id} with conversation {conversation.id}")
     
     return await build_team_list_item(team)
 
@@ -199,6 +272,9 @@ async def get_my_team(current_user: CurrentUser):
     if not team:
         return None
     
+    # Ensure team has conversation
+    conversation_id = await ensure_team_conversation(team)
+    
     owner = await get_owner_info(team.owner_id)
     members = await get_team_members_info(team.id)
     
@@ -216,7 +292,56 @@ async def get_my_team(current_user: CurrentUser):
         members=members,
         is_owner=True,
         has_requested=False,
+        conversation_id=conversation_id,
     )
+
+
+@router.get("/joined", response_model=Optional[TeamDetail])
+async def get_joined_team(current_user: CurrentUser):
+    """
+    Get the team that the current user has joined (as member, not owner).
+    """
+    now = utc_now()
+    
+    # Find team memberships where user is not the owner
+    memberships = await TeamMember.find(
+        TeamMember.user_id == current_user.id
+    ).to_list()
+    
+    for membership in memberships:
+        team = await Team.find_one(And(
+            Team.id == membership.team_id,
+            Team.is_active == True,
+            Team.expires_at > now,
+            Team.owner_id != current_user.id,  # Not owner
+        ))
+        
+        if team:
+            # Ensure team has conversation
+            conversation_id = await ensure_team_conversation(team)
+            
+            owner = await get_owner_info(team.owner_id)
+            members = await get_team_members_info(team.id)
+            
+            return TeamDetail(
+                id=team.id,
+                name=team.name,
+                description=team.description,
+                owner=owner,
+                rank=team.rank.value if team.rank else "BRONZE",
+                game_mode=team.game_mode.value,
+                max_members=team.max_members,
+                current_members=team.current_members,
+                created_at=team.created_at,
+                expires_at=team.expires_at,
+                members=members,
+                is_owner=False,
+                is_member=True,
+                has_requested=False,
+                conversation_id=conversation_id,
+            )
+    
+    return None
 
 
 @router.get("/{team_id}", response_model=TeamDetail)
@@ -247,6 +372,11 @@ async def get_team_detail(
     # Check if current user is a member of this team
     is_member = any(m.user_id == current_user.id for m in members)
     
+    # Ensure team has conversation if user is member
+    conversation_id = None
+    if is_member:
+        conversation_id = await ensure_team_conversation(team)
+    
     return TeamDetail(
         id=team.id,
         name=team.name,
@@ -262,6 +392,7 @@ async def get_team_detail(
         is_owner=team.owner_id == current_user.id,
         is_member=is_member,
         has_requested=has_requested,
+        conversation_id=conversation_id,  # Only show to members
     )
 
 
@@ -399,6 +530,7 @@ async def approve_join_request(
 ):
     """
     Approve a join request. Owner only.
+    Also adds the user to the team's group chat.
     """
     team = await Team.get(team_id)
     if not team:
@@ -428,6 +560,15 @@ async def approve_join_request(
         user_id=join_request.user_id,
     )
     await new_member.insert()
+    
+    # Add user to team chat conversation
+    if team.conversation_id:
+        await message_service.add_participant(
+            conversation_id=team.conversation_id,
+            user_id=join_request.user_id,
+            role=ParticipantRole.MEMBER,
+        )
+        logger.info(f"User {join_request.user_id} added to team chat {team.conversation_id}")
     
     # Update team member count
     team.current_members += 1
@@ -502,6 +643,7 @@ async def remove_member(
 ):
     """
     Remove a member from the team. Owner only.
+    Also removes from team chat.
     """
     team = await Team.get(team_id)
     if not team:
@@ -522,6 +664,14 @@ async def remove_member(
     
     await member.delete()
     
+    # Remove user from team chat conversation
+    if team.conversation_id:
+        await message_service.remove_participant(
+            conversation_id=team.conversation_id,
+            user_id=user_id,
+        )
+        logger.info(f"User {user_id} removed from team chat {team.conversation_id}")
+    
     # Update team member count
     team.current_members = max(1, team.current_members - 1)
     team.updated_at = utc_now()
@@ -532,6 +682,37 @@ async def remove_member(
     return {"message": "Member removed successfully"}
 
 
+@router.get("/{team_id}/chat")
+async def get_team_chat(
+    team_id: str,
+    current_user: CurrentUser,
+):
+    """
+    Get the conversation ID for team chat.
+    Only team members can access this.
+    Auto-creates conversation if not exists.
+    """
+    team = await Team.get(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if user is a member
+    member = await TeamMember.find_one(And(
+        TeamMember.team_id == team_id,
+        TeamMember.user_id == current_user.id,
+    ))
+    if not member:
+        raise HTTPException(status_code=403, detail="Only team members can access team chat")
+    
+    # Ensure team has conversation
+    conversation_id = await ensure_team_conversation(team)
+    
+    return {
+        "conversation_id": conversation_id,
+        "team_name": team.name,
+    }
+
+
 @router.post("/{team_id}/leave")
 async def leave_team(
     team_id: str,
@@ -539,6 +720,7 @@ async def leave_team(
 ):
     """
     Leave a team. The owner cannot leave (must delete team instead).
+    Also leaves the team chat.
     """
     team = await Team.get(team_id)
     if not team:
@@ -555,6 +737,14 @@ async def leave_team(
         raise HTTPException(status_code=400, detail="You are not a member of this team")
     
     await member.delete()
+    
+    # Remove user from team chat conversation
+    if team.conversation_id:
+        await message_service.remove_participant(
+            conversation_id=team.conversation_id,
+            user_id=current_user.id,
+        )
+        logger.info(f"User {current_user.id} left team chat {team.conversation_id}")
     
     # Update team member count
     team.current_members = max(1, team.current_members - 1)

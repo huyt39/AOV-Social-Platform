@@ -62,6 +62,7 @@ class Conversation(Document):
     name: Optional[str] = None  # For group chats
     avatar_url: Optional[str] = None  # Group avatar
     created_by: Optional[str] = None  # User ID who created (for groups)
+    team_id: Optional[str] = None  # If set, this is a team chat (hidden from regular chat list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)  # Last activity
     last_message_id: Optional[str] = None  # For quick preview
@@ -73,6 +74,7 @@ class Conversation(Document):
         indexes = [
             "created_at",
             "updated_at",
+            "team_id",
         ]
 
 

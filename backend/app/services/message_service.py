@@ -118,7 +118,7 @@ class MessageService:
         cursor: Optional[str] = None,
         limit: int = 20,
     ) -> ConversationsResponse:
-        """Get all conversations for a user."""
+        """Get all conversations for a user (excludes team chats)."""
         # Get participant records
         query_conditions = [
             ConversationParticipant.user_id == user_id,
@@ -133,7 +133,14 @@ class MessageService:
             return ConversationsResponse(data=[], next_cursor=None, has_more=False)
         
         # Get conversations using $in operator - use _id for raw MongoDB query
-        conv_query = {"_id": {"$in": conv_ids}}
+        # Exclude team chats (team_id is null or doesn't exist)
+        conv_query = {
+            "_id": {"$in": conv_ids},
+            "$or": [
+                {"team_id": None},
+                {"team_id": {"$exists": False}},
+            ]
+        }
         
         if cursor:
             cursor_dt = datetime.fromisoformat(cursor.replace("Z", "+00:00"))
