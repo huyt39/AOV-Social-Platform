@@ -23,6 +23,7 @@ from app.models import (
     User,
     utc_now,
 )
+from app.services.redis_client import redis_service
 
 logger = logging.getLogger(__name__)
 
@@ -258,12 +259,19 @@ class MessageService:
         for p in participants:
             user = await User.find_one(User.id == p.user_id)
             if user:
+                # Check online status from Redis
+                is_online = False
+                try:
+                    is_online = await redis_service.is_user_online(p.user_id)
+                except Exception:
+                    pass  # Redis might not be connected, default to offline
+                
                 result.append(ParticipantInfo(
                     user_id=p.user_id,
                     username=user.username,
                     avatar_url=user.avatar_url,
                     role=p.role,
-                    is_online=False,  # TODO: Check Redis for online status
+                    is_online=is_online,
                 ))
         
         return result
