@@ -167,6 +167,8 @@ async def register_arena_user(
             "email": user.email,
             "rank": user.rank.value if user.rank else None,
             "main_role": user.main_role.value if user.main_role else None,
+            "role": user.role.value if user.role else "USER",
+            "is_superuser": user.is_superuser,
         },
     }
 
@@ -216,6 +218,8 @@ async def login_arena_user(
             "win_rate": user.win_rate,
             "total_matches": user.total_matches,
             "credibility_score": user.credibility_score,
+            "role": user.role.value if user.role else "USER",
+            "is_superuser": user.is_superuser,
         },
     }
 
