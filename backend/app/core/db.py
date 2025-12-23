@@ -9,7 +9,7 @@ from app.models import (
     ForumCategory, ForumThread, ForumThreadLike, 
     ForumComment, ForumCommentLike, Report, Video, Notification,
     Conversation, ConversationParticipant, Message,
-    Reel, ReelView, ReelLike,
+    Reel, ReelView, ReelLike, ReelComment, ReelCommentLike,
     Team, TeamMember, TeamJoinRequest,
     Champion, ChatbotConversation,
 )
@@ -42,7 +42,7 @@ async def connect_to_mongodb() -> None:
             ForumCategory, ForumThread, ForumThreadLike, 
             ForumComment, ForumCommentLike, Report, Video, Notification,
             Conversation, ConversationParticipant, Message,
-            Reel, ReelView, ReelLike,
+            Reel, ReelView, ReelLike, ReelComment, ReelCommentLike,
             Team, TeamMember, TeamJoinRequest,
             Champion, ChatbotConversation,
         ],

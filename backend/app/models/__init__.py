@@ -171,6 +171,12 @@ from .reel import (
     ReelPublic,
     ReelViewRequest,
     ReelFeedResponse,
+    ReelComment,
+    ReelCommentLike,
+    ReelCommentCreate,
+    ReelCommentAuthor,
+    ReelCommentPublic,
+    ReelCommentsResponse,
 )
 
 # Notification models
@@ -326,6 +332,12 @@ __all__ = [
     "ReelPublic",
     "ReelViewRequest",
     "ReelFeedResponse",
+    "ReelComment",
+    "ReelCommentLike",
+    "ReelCommentCreate",
+    "ReelCommentAuthor",
+    "ReelCommentPublic",
+    "ReelCommentsResponse",
     # Notification
     "NotificationType",
     "Notification",

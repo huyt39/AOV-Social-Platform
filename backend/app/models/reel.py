@@ -127,3 +127,76 @@ class ReelFeedResponse(BaseModel):
     reels: list[ReelPublic]
     has_more: bool
 
+
+class ReelComment(Document):
+    """Comment on a reel."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    reel_id: str
+    author_id: str
+    content: str = Field(..., min_length=1, max_length=1000)
+    parent_id: Optional[str] = None  # For replies
+    reply_to_user_id: Optional[str] = None
+    like_count: int = Field(default=0)
+    reply_count: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "reel_comments"
+        use_state_management = True
+        indexes = [
+            [("reel_id", 1), ("created_at", -1)],
+            [("parent_id", 1)],
+        ]
+
+
+class ReelCommentLike(Document):
+    """Track reel comment likes."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    comment_id: str
+    user_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "reel_comment_likes"
+        use_state_management = True
+        indexes = [
+            [("comment_id", 1), ("user_id", 1)],
+        ]
+
+
+class ReelCommentCreate(BaseModel):
+    """Schema for creating a reel comment."""
+    content: str = Field(..., min_length=1, max_length=1000)
+    parent_id: Optional[str] = None
+    reply_to_user_id: Optional[str] = None
+
+
+class ReelCommentAuthor(BaseModel):
+    """Author info for reel comment."""
+    id: str
+    username: str
+    avatar_url: Optional[str] = None
+
+
+class ReelCommentPublic(BaseModel):
+    """Public reel comment response."""
+    id: str
+    reel_id: str
+    author_id: str
+    author: ReelCommentAuthor
+    content: str
+    parent_id: Optional[str] = None
+    reply_to_user_id: Optional[str] = None
+    reply_to_username: Optional[str] = None
+    like_count: int = 0
+    reply_count: int = 0
+    is_liked: bool = False
+    created_at: datetime
+
+
+class ReelCommentsResponse(BaseModel):
+    """Response for reel comments with cursor pagination."""
+    data: list[ReelCommentPublic]
+    next_cursor: Optional[str] = None
+    has_more: bool = False
