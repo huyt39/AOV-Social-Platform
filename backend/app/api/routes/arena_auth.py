@@ -1,14 +1,22 @@
 """Arena-specific authentication routes for game platform."""
 
-import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, UploadFile
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.security import get_password_hash
-from pydantic import BaseModel, EmailStr, Field
+from app.core.logger import get_logger, log_business_error
+from app.core.exceptions import (
+    ValidationException,
+    NotFoundException,
+    ConflictException,
+    UnauthorizedException,
+    ForbiddenException,
+    InternalServerException,
+)
 
 from app.models import (
     ArenaUserRegister,
@@ -22,7 +30,7 @@ from app.services.gemini import gemini_service
 from app.services.upload import UploadServiceFactory
 from app.api.deps import CurrentUser
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["arena-auth"])
 
@@ -50,15 +58,16 @@ async def verify_profile(
     """
     # Validate file type
     if not profile_screenshot.content_type:
-        raise HTTPException(
-            status_code=400, detail="File type could not be determined"
+        raise ValidationException(
+            error_code="FILE_TYPE_ERROR",
+            message="Không thể xác định loại file"
         )
 
     allowed_types = ["image/jpeg", "image/jpg", "image/png"]
     if profile_screenshot.content_type.lower() not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail="Only JPG and PNG images are allowed",
+        raise ValidationException(
+            error_code="INVALID_FILE_TYPE",
+            message="Chỉ chấp nhận file JPG hoặc PNG"
         )
 
     # Validate file size (5MB max)
@@ -66,9 +75,9 @@ async def verify_profile(
     max_size = 5 * 1024 * 1024  # 5MB
 
     if len(content) > max_size:
-        raise HTTPException(
-            status_code=400,
-            detail="File size exceeds 5MB limit",
+        raise ValidationException(
+            error_code="FILE_TOO_LARGE",
+            message="Kích thước file vượt quá giới hạn 5MB"
         )
 
     # TODO: Upload to cloud storage (S3/Cloudinary) and get URL
@@ -80,9 +89,9 @@ async def verify_profile(
         verified_data = await gemini_service.verify_profile_screenshot(content)
     except ValueError as e:
         logger.error(f"Gemini API error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Profile verification service is not available. Please check API configuration.",
+        raise InternalServerException(
+            error_code="PROFILE_VERIFICATION_ERROR",
+            message="Dịch vụ xác thực hồ sơ không khả dụng. Vui lòng thử lại sau."
         )
 
     if not verified_data:
@@ -93,10 +102,10 @@ async def verify_profile(
             "Tỷ lệ thắng",
             "Uy tín",
         ]
-        raise HTTPException(
-            status_code=400,
-            detail="Không nhận diện đủ thông tin hồ sơ. Vui lòng chụp rõ hơn các thông tin: "
-            + ", ".join(missing_fields),
+        raise ValidationException(
+            error_code="PROFILE_VERIFICATION_FAILED",
+            message="Không nhận diện đủ thông tin hồ sơ. Vui lòng chụp rõ hơn các thông tin: "
+            + ", ".join(missing_fields)
         )
 
     # Add screenshot URL to response
@@ -120,17 +129,17 @@ async def register_arena_user(
     # Check if username already exists
     existing_user = await User.find_one(User.username == user_in.username)
     if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Username already registered",
+        raise ConflictException(
+            error_code="USERNAME_ALREADY_EXISTS",
+            message="Tên người dùng đã được đăng ký"
         )
 
     # Check if email already exists
     existing_user = await User.find_one(User.email == user_in.email)
     if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered",
+        raise ConflictException(
+            error_code="EMAIL_ALREADY_EXISTS",
+            message="Email đã được đăng ký"
         )
 
     # Create new user
@@ -193,10 +202,17 @@ async def login_arena_user(
     user = await User.find_one(User.email == login_data.email)
 
     if not user or not verify_password(login_data.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        log_business_error(logger, "LOGIN_FAILED", "Invalid credentials attempt", {"email": login_data.email})
+        raise UnauthorizedException(
+            error_code="INVALID_CREDENTIALS",
+            message="Email hoặc mật khẩu không chính xác"
+        )
 
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise ForbiddenException(
+            error_code="ACCOUNT_INACTIVE",
+            message="Tài khoản đã bị vô hiệu hóa"
+        )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
@@ -236,24 +252,25 @@ async def upload_image(
     """
     # Validate file type
     if not image.content_type:
-        raise HTTPException(
-            status_code=400, detail="File type could not be determined"
+        raise ValidationException(
+            error_code="FILE_TYPE_ERROR",
+            message="Không thể xác định loại file"
         )
 
     allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
     if image.content_type.lower() not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail="Only JPG, PNG, GIF and WebP images are allowed",
+        raise ValidationException(
+            error_code="INVALID_FILE_TYPE",
+            message="Chỉ chấp nhận file JPG, PNG, GIF và WebP"
         )
 
     content = await image.read()
     max_size = 5 * 1024 * 1024  # 5MB
 
     if len(content) > max_size:
-        raise HTTPException(
-            status_code=400,
-            detail="File size exceeds 5MB limit",
+        raise ValidationException(
+            error_code="FILE_TOO_LARGE",
+            message="Kích thước file vượt quá giới hạn 5MB"
         )
 
     try:
@@ -270,9 +287,9 @@ async def upload_image(
         }
     except ValueError as e:
         logger.error(f"Image upload failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Image upload failed. Please try again.",
+        raise InternalServerException(
+            error_code="IMAGE_UPLOAD_FAILED",
+            message="Tải ảnh lên thất bại. Vui lòng thử lại."
         )
 
 
@@ -286,9 +303,9 @@ async def upload_video_deprecated() -> dict[str, Any]:
     2. PUT to pre-signed URL -> upload directly to S3
     3. POST /videos/{video_id}/complete -> trigger processing
     """
-    raise HTTPException(
-        status_code=410,
-        detail="This endpoint is deprecated. Use /videos/upload-request for video uploads with pre-signed URLs."
+    raise ValidationException(
+        error_code="ENDPOINT_DEPRECATED",
+        message="Endpoint này đã ngừng sử dụng. Vui lòng dùng /videos/upload-request để tải video lên."
     )
 
 @router.get("/me")
@@ -328,7 +345,12 @@ async def get_user_profile(
     user = await User.find_one(User.id == user_id)
     
     if not user:
-        raise HTTPException(status_code=404, detail="Người dùng không tồn tại")
+        raise NotFoundException(
+            error_code="USER_NOT_FOUND",
+            message="Người dùng không tồn tại",
+            resource_type="user",
+            resource_id=user_id
+        )
     
     return {
         "success": True,
@@ -406,9 +428,9 @@ async def update_profile(
         # Check if username already exists
         existing_user = await User.find_one(User.username == profile_data.username)
         if existing_user:
-            raise HTTPException(
-                status_code=400,
-                detail="Tên người dùng đã tồn tại",
+            raise ConflictException(
+                error_code="USERNAME_ALREADY_EXISTS",
+                message="Tên người dùng đã tồn tại"
             )
         current_user.username = profile_data.username
         updated_fields.append("username")
@@ -419,9 +441,10 @@ async def update_profile(
             current_user.main_role = GameRoleEnum(profile_data.main_role)
             updated_fields.append("main_role")
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Vị trí không hợp lệ: {profile_data.main_role}",
+            raise ValidationException(
+                error_code="INVALID_ROLE",
+                message=f"Vị trí không hợp lệ: {profile_data.main_role}",
+                field="main_role"
             )
     
     # Update game stats from verified screenshot if provided
@@ -434,9 +457,10 @@ async def update_profile(
             current_user.rank = RankEnum(profile_data.rank)
             updated_fields.append("rank")
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Rank không hợp lệ: {profile_data.rank}",
+            raise ValidationException(
+                error_code="INVALID_RANK",
+                message=f"Rank không hợp lệ: {profile_data.rank}",
+                field="rank"
             )
     
     if profile_data.win_rate is not None:

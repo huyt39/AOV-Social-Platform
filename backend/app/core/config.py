@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str | None = None
     AWS_S3_BUCKET: str | None = None
     AWS_REGION: str = "ap-southeast-1"
+    
+    # Logging Configuration
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_FORMAT: str = "json"  # "json" for production, "pretty" for development
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
