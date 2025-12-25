@@ -103,6 +103,11 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_URL: str = "redis://localhost:6379"
     
+    # LiveKit Configuration
+    LIVEKIT_URL: str = "wss://liqi-wo9viehf.livekit.cloud"
+    LIVEKIT_API_KEY: str = "API9wR2Mey5NKsr"
+    LIVEKIT_API_SECRET: str = "6yx3Xp4kTeUJrYjJ2wUfGQBjFOG3lO3zebciNNlblGLA"
+    
     # CDN Configuration (initially same as S3 external endpoint)
     CDN_BASE_URL: str = "https://objectstorageapi.ap-southeast-1.clawcloudrun.com"
     

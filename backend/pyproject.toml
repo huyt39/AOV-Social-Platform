@@ -33,6 +33,7 @@ dependencies = [
     "websockets>=15.0.1",
     "certifi>=2024.8.30",
     "numpy>=2.2.6",
+    "livekit-api",
 ]
 
 [tool.uv]

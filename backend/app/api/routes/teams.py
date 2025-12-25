@@ -32,7 +32,10 @@ from app.models import (
     ConversationType,
     ParticipantRole,
 )
+import json
+from app.core.config import settings
 from app.services.message_service import message_service
+from app.services.livekit_service import livekit_service
 
 logger = logging.getLogger(__name__)
 
@@ -754,3 +757,48 @@ async def leave_team(
     logger.info(f"User {current_user.id} left team {team_id}")
     
     return {"message": "You have left the team"}
+
+
+@router.get("/{team_id}/livekit-token")
+async def get_livekit_token(
+    team_id: str,
+    current_user: CurrentUser,
+):
+    """
+    Generate a LiveKit token for the team's voice room.
+    Only team members can access this.
+    """
+    team = await Team.get(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Check if user is a member
+    member = await TeamMember.find_one(And(
+        TeamMember.team_id == team_id,
+        TeamMember.user_id == current_user.id,
+    ))
+    if not member:
+        raise HTTPException(status_code=403, detail="Only team members can access voice chat")
+    
+    # Use team ID as room name for uniqueness
+    room_name = f"team_{team_id}"
+    
+    # Include avatar and other info in metadata
+    metadata = json.dumps({
+        "avatar_url": current_user.avatar_url,
+        "username": current_user.username,
+        "rank": current_user.rank.value if current_user.rank else None
+    })
+    
+    token = livekit_service.generate_token(
+        room_name=room_name,
+        identity=current_user.id,
+        name=current_user.username,
+        metadata=metadata
+    )
+    
+    return {
+        "token": token,
+        "url": settings.LIVEKIT_URL,
+        "room_name": room_name
+    }
