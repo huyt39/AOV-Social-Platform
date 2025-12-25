@@ -80,7 +80,7 @@ async def search_users_for_messaging(
     users = await User.find(
         {
             "username": {"$regex": escaped_query, "$options": "i"},
-            "id": {"$in": friend_ids},
+            "_id": {"$in": friend_ids},
             "is_active": True,
         }
     ).limit(limit).to_list()
