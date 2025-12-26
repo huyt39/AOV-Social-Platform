@@ -24,6 +24,7 @@ class Reel(Document):
     video_url: str  # HLS or direct video URL
     video_raw_url: Optional[str] = None  # Raw video URL (fallback khi chưa processed)
     thumbnail_url: str
+    temp_thumbnail_url: Optional[str] = None  # Client-uploaded thumbnail before processing
     duration: float  # in seconds
     video_processed: bool = False  # Flag đánh dấu video đã xử lý xong
     
@@ -81,12 +82,29 @@ class ReelLike(Document):
         ]
 
 
+class ReelSave(Document):
+    """Track saved reels."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    user_id: str
+    reel_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+    
+    class Settings:
+        name = "reel_saves"
+        use_state_management = True
+        indexes = [
+            [("user_id", 1), ("reel_id", 1)],  # Unique save per user per reel
+            [("user_id", 1), ("created_at", -1)],  # For retrieving user's saved reels
+        ]
+
+
 class ReelCreateRequest(BaseModel):
     """Request schema for creating a reel."""
     video_id: str
     caption: Optional[str] = Field(None, max_length=500)
     music_name: Optional[str] = Field(None, max_length=100)
     music_artist: Optional[str] = Field(None, max_length=100)
+    temp_thumbnail_url: Optional[str] = Field(None, max_length=1000)  # Client-uploaded thumbnail
 
 
 class ReelPublic(BaseModel):
@@ -112,6 +130,7 @@ class ReelPublic(BaseModel):
     shares_count: int
     
     is_liked: bool = False  # Whether current user liked it
+    is_saved: bool = False  # Whether current user saved it
     
     created_at: datetime
 

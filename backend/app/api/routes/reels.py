@@ -4,13 +4,14 @@ import random
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form
 
 from app.api.deps import CurrentUser
 from app.models import (
     Reel,
     ReelView,
     ReelLike,
+    ReelSave,
     ReelCreateRequest,
     ReelPublic,
     ReelViewRequest,
@@ -66,13 +67,14 @@ async def create_reel(
         video_raw_url = None
         thumbnail_url = video.thumbnail_url or ""
     else:
-        # Video is still processing - use raw URL
+        # Video is still processing - use raw URL and temp thumbnail if provided
         video_raw_url = clawcloud_s3.get_public_url(
             settings.S3_RAW_BUCKET, 
             video.raw_key
         )
         video_url = video_raw_url  # Temp use raw as main URL
-        thumbnail_url = ""  # No thumbnail yet
+        # Use temp thumbnail if provided, otherwise empty
+        thumbnail_url = reel_data.temp_thumbnail_url or ""
     
     # Create reel
     reel = Reel(
@@ -84,6 +86,7 @@ async def create_reel(
         video_url=video_url,
         video_raw_url=video_raw_url,
         thumbnail_url=thumbnail_url,
+        temp_thumbnail_url=reel_data.temp_thumbnail_url,
         duration=video.duration or 0,
         video_processed=video_processed,
     )
@@ -112,6 +115,51 @@ async def create_reel(
         is_liked=False,
         created_at=reel.created_at,
     )
+
+
+@router.post("/upload-thumbnail")
+async def upload_thumbnail(
+    current_user: CurrentUser,
+    thumbnail: UploadFile = File(...),
+    video_id: str = Form(...),
+) -> dict[str, Any]:
+    """
+    Upload a client-extracted thumbnail for a reel.
+    
+    This endpoint allows uploading a thumbnail image before video processing
+    completes, providing immediate preview in the UI.
+    """
+    # Validate file type
+    if not thumbnail.content_type or not thumbnail.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Read thumbnail data
+    thumbnail_data = await thumbnail.read()
+    
+    # Upload to S3 in temp location
+    temp_key = f"temp-thumbnails/{video_id}.jpg"
+    success = await clawcloud_s3.upload_file(
+        bucket=settings.S3_PROCESSED_BUCKET,
+        s3_key=temp_key,
+        data=thumbnail_data,
+        content_type="image/jpeg",
+        internal=False,
+    )
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to upload thumbnail")
+    
+    # Get public URL
+    thumbnail_url = clawcloud_s3.get_public_url(settings.S3_PROCESSED_BUCKET, temp_key)
+    
+    logger.info(f"Uploaded temp thumbnail for video {video_id} by user {current_user.id}")
+    
+    return {
+        "success": True,
+        "thumbnail_url": thumbnail_url,
+        "video_id": video_id,
+    }
+
 
 
 @router.get("/feed", response_model=ReelFeedResponse)
@@ -174,6 +222,14 @@ async def get_reel_feed(
     user_likes = await ReelLike.find(likes_query).to_list()
     liked_reel_ids = {like.reel_id for like in user_likes}
     
+    # Get save status for current user
+    saves_query = {
+        "user_id": current_user.id,
+        "reel_id": {"$in": reel_ids}
+    }
+    user_saves = await ReelSave.find(saves_query).to_list()
+    saved_reel_ids = {save.reel_id for save in user_saves}
+    
     # Build response
     reel_publics = []
     for reel in reels_to_return:
@@ -197,6 +253,7 @@ async def get_reel_feed(
                 comments_count=reel.comments_count,
                 shares_count=reel.shares_count,
                 is_liked=reel.id in liked_reel_ids,
+                is_saved=reel.id in saved_reel_ids,
                 created_at=reel.created_at,
             )
         )
@@ -246,8 +303,17 @@ async def get_user_reels(
         }
         user_likes = await ReelLike.find(likes_query).to_list()
         liked_reel_ids = {like.reel_id for like in user_likes}
+        
+        # Get save status for current user
+        saves_query = {
+            "user_id": current_user.id,
+            "reel_id": {"$in": reel_ids}
+        }
+        user_saves = await ReelSave.find(saves_query).to_list()
+        saved_reel_ids = {save.reel_id for save in user_saves}
     else:
         liked_reel_ids = set()
+        saved_reel_ids = set()
     
     # Build response
     reel_publics = []
@@ -271,6 +337,7 @@ async def get_user_reels(
                 comments_count=reel.comments_count,
                 shares_count=reel.shares_count,
                 is_liked=reel.id in liked_reel_ids,
+                is_saved=reel.id in saved_reel_ids,
                 created_at=reel.created_at,
             )
         )
@@ -365,6 +432,127 @@ async def like_reel(
         return {"success": True, "liked": True, "likes_count": reel.likes_count}
 
 
+@router.post("/{reel_id}/save")
+async def save_reel(
+    reel_id: str,
+    current_user: CurrentUser,
+) -> Any:
+    """
+    Save or unsave a reel.
+    """
+    # Check if reel exists
+    reel = await Reel.find_one(Reel.id == reel_id)
+    if not reel:
+        raise HTTPException(status_code=404, detail="Reel not found")
+    
+    # Check if already saved
+    existing_save = await ReelSave.find_one(
+        ReelSave.user_id == current_user.id,
+        ReelSave.reel_id == reel_id,
+    )
+    
+    if existing_save:
+        # Unsave - remove save
+        await existing_save.delete()
+        return {"success": True, "saved": False}
+    else:
+        # Save - add save
+        save = ReelSave(
+            user_id=current_user.id,
+            reel_id=reel_id,
+        )
+        await save.insert()
+        return {"success": True, "saved": True}
+
+
+@router.get("/saved", response_model=ReelFeedResponse)
+async def get_saved_reels(
+    current_user: CurrentUser,
+    limit: int = Query(default=50, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> Any:
+    """
+    Get all reels saved by the current user.
+    """
+    # Get user's saved reels
+    total_saves = await ReelSave.find(
+        ReelSave.user_id == current_user.id,
+    ).count()
+    
+    saves = await ReelSave.find(
+        ReelSave.user_id == current_user.id,
+    ).sort(-ReelSave.created_at).skip(offset).limit(limit).to_list()
+    
+    if not saves:
+        return ReelFeedResponse(
+            reels=[],
+            has_more=False,
+        )
+    
+    # Get the actual reels
+    saved_reel_ids = [save.reel_id for save in saves]
+    reels_query = {"_id": {"$in": saved_reel_ids}}
+    reels = await Reel.find(reels_query).to_list()
+    
+    # Create a map to maintain order
+    reels_map = {reel.id: reel for reel in reels}
+    
+    # Get user info for each reel
+    user_ids = list(set(reel.user_id for reel in reels))
+    users_query = {"_id": {"$in": user_ids}}
+    users = await User.find(users_query).to_list()
+    user_map = {user.id: user for user in users}
+    
+    # Get like status for current user
+    likes_query = {
+        "user_id": current_user.id,
+        "reel_id": {"$in": saved_reel_ids}
+    }
+    user_likes = await ReelLike.find(likes_query).to_list()
+    liked_reel_ids = {like.reel_id for like in user_likes}
+    
+    # Build response in the order of saves
+    reel_publics = []
+    for save in saves:
+        reel = reels_map.get(save.reel_id)
+        if not reel:
+            continue
+        
+        user = user_map.get(reel.user_id)
+        reel_publics.append(
+            ReelPublic(
+                id=reel.id,
+                user_id=reel.user_id,
+                username=user.username if user else "Unknown",
+                user_avatar=user.avatar_url if user else None,
+                video_url=reel.video_url,
+                video_raw_url=reel.video_raw_url,
+                thumbnail_url=reel.thumbnail_url,
+                duration=reel.duration,
+                video_processed=reel.video_processed,
+                caption=reel.caption,
+                music_name=reel.music_name,
+                music_artist=reel.music_artist,
+                views_count=reel.views_count,
+                likes_count=reel.likes_count,
+                comments_count=reel.comments_count,
+                shares_count=reel.shares_count,
+                is_liked=reel.id in liked_reel_ids,
+                is_saved=True,  # All these reels are saved
+                created_at=reel.created_at,
+            )
+        )
+    
+    has_more = (offset + limit) < total_saves
+    
+    logger.info(f"Returning {len(reel_publics)} saved reels for user {current_user.id}")
+    
+    return ReelFeedResponse(
+        reels=reel_publics,
+        has_more=has_more,
+    )
+
+
 @router.post("/reset-views")
 async def reset_viewed_reels(
     current_user: CurrentUser,
@@ -408,6 +596,12 @@ async def get_reel(
         ReelLike.reel_id == reel_id,
     )
     
+    # Check if saved by current user
+    save = await ReelSave.find_one(
+        ReelSave.user_id == current_user.id,
+        ReelSave.reel_id == reel_id,
+    )
+    
     return ReelPublic(
         id=reel.id,
         user_id=reel.user_id,
@@ -426,6 +620,7 @@ async def get_reel(
         comments_count=reel.comments_count,
         shares_count=reel.shares_count,
         is_liked=like is not None,
+        is_saved=save is not None,
         created_at=reel.created_at,
     )
 
