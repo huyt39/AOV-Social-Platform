@@ -33,6 +33,9 @@ class UserBase(BaseModel):
     win_rate: Optional[float] = None
     total_matches: Optional[int] = None
     credibility_score: Optional[int] = None
+    
+    # Last active timestamp for online status tracking
+    last_active_at: Optional[datetime] = None
 
 
 # Properties to receive via API on creation
@@ -91,6 +94,7 @@ class UserUpdate(BaseModel):
     win_rate: Optional[float] = None
     total_matches: Optional[int] = None
     credibility_score: Optional[int] = None
+    last_active_at: Optional[datetime] = None
     password: Optional[str] = Field(default=None, min_length=8, max_length=40)
 
 

@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from app.core import security
 from app.core.config import settings
-from app.models import TokenPayload, User, MessageCreate, MediaAttachment
+from app.models import TokenPayload, User, MessageCreate, MediaAttachment, utc_now
 from app.services.redis_client import redis_service
 from app.services.message_service import message_service
 from app.services.rabbitmq import publish_message_event, MessageRoutingKey
@@ -58,6 +58,15 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"Failed to register socket in Redis: {e}")
         
+        # Update user's last_active_at
+        try:
+            user = await User.find_one(User.id == user_id)
+            if user:
+                user.last_active_at = utc_now()
+                await user.save()
+        except Exception as e:
+            logger.warning(f"Failed to update last_active_at on connect: {e}")
+        
         logger.info(f"WebSocket connected: user={user_id}, socket={socket_id}")
         return socket_id
     
@@ -80,6 +89,15 @@ class ConnectionManager:
             await redis_service.remove_socket(user_id, socket_id)
         except Exception as e:
             logger.error(f"Failed to remove socket from Redis: {e}")
+        
+        # Update user's last_active_at on disconnect
+        try:
+            user = await User.find_one(User.id == user_id)
+            if user:
+                user.last_active_at = utc_now()
+                await user.save()
+        except Exception as e:
+            logger.warning(f"Failed to update last_active_at on disconnect: {e}")
         
         logger.info(f"WebSocket disconnected: user={user_id}, socket={socket_id}")
     

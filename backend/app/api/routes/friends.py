@@ -317,8 +317,8 @@ async def get_online_friends(
     current_user: CurrentUser,
 ) -> dict[str, Any]:
     """
-    Get list of friends who are currently online.
-    Checks Redis for active WebSocket connections.
+    Get list of all friends sorted by online status and last activity.
+    Online friends are shown first, then sorted by last_active_at (most recent first).
     """
     # Find all accepted friendships
     friendships = await Friendship.find(
@@ -337,29 +337,46 @@ async def get_online_friends(
         else:
             friend_ids.append(f.requester_id)
 
-    # Check which friends are online
-    online_friends = []
+    # Get all friends with their online status
+    all_friends = []
     for friend_id in friend_ids:
         try:
-            is_online = await redis_service.is_user_online(friend_id)
-            if is_online:
-                user = await User.find_one(User.id == friend_id)
-                if user:
-                    online_friends.append({
-                        "id": user.id,
-                        "username": user.username,
-                        "avatar_url": user.avatar_url,
-                        "rank": user.rank.value if user.rank else None,
-                        "level": user.level,
-                    })
+            user = await User.find_one(User.id == friend_id)
+            if user:
+                is_online = await redis_service.is_user_online(friend_id)
+                all_friends.append({
+                    "id": user.id,
+                    "username": user.username,
+                    "avatar_url": user.avatar_url,
+                    "rank": user.rank.value if user.rank else None,
+                    "level": user.level,
+                    "is_online": is_online,
+                    "last_active_at": user.last_active_at.isoformat() if user.last_active_at else None,
+                })
         except Exception as e:
-            logger.warning(f"Failed to check online status for {friend_id}: {e}")
+            logger.warning(f"Failed to get friend data for {friend_id}: {e}")
             continue
+
+    # Sort: online users first, then by last_active_at (most recent first)
+    def sort_key(friend):
+        # Online users get priority (0 = online, 1 = offline)
+        online_priority = 0 if friend["is_online"] else 1
+        # For last_active_at, use datetime.min if None (put users with no activity last)
+        last_active = friend["last_active_at"] or ""
+        # Negate for descending order (most recent first)
+        return (online_priority, last_active == "", last_active)
+    
+    # Sort with online first, then by last_active_at descending
+    all_friends.sort(key=lambda f: (
+        0 if f["is_online"] else 1,
+        f["last_active_at"] is None,
+        -(datetime.fromisoformat(f["last_active_at"]).timestamp() if f["last_active_at"] else 0)
+    ))
 
     return {
         "success": True,
-        "data": online_friends,
-        "count": len(online_friends),
+        "data": all_friends,
+        "count": len(all_friends),
     }
 
 
