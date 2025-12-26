@@ -62,3 +62,20 @@ class FriendshipStatusResponse(BaseModel):
     is_friend: bool = False
     friendship_id: Optional[str] = None
     is_requester: bool = False  # True if current user sent the request
+
+
+class FriendSuggestion(BaseModel):
+    """Friend suggestion with score."""
+    id: str
+    username: str
+    avatar_url: Optional[str] = None
+    rank: Optional[RankEnum] = None
+    level: Optional[int] = None
+    mutual_friends_count: int = 0
+    suggestion_score: float  # 0-10
+
+
+class FriendSuggestionsResponse(BaseModel):
+    """Response for friend suggestions."""
+    data: list[FriendSuggestion]
+    count: int

@@ -401,3 +401,45 @@ async def get_friendship_status(
         friendship_id=friendship.id,
         is_requester=friendship.requester_id == current_user.id,
     )
+
+
+@router.get("/suggestions")
+async def get_friend_suggestions(
+    current_user: CurrentUser,
+    limit: int = 10,
+) -> dict[str, Any]:
+    """
+    Get AI-powered friend suggestions for the current user.
+    
+    Uses hybrid recommendation algorithm combining:
+    - Collaborative Filtering (45%): Mutual friends via Adamic-Adar Index
+    - Content-Based Filtering (35%): Similar post likes
+    - Rank Proximity (20%): Similar game ranks
+    
+    Query Parameters:
+    - limit: Number of suggestions to return (default 10, max 50)
+    
+    Returns:
+    - List of suggested users with scores, sorted by relevance
+    """
+    from app.services.recommendation_service import get_friend_suggestions as get_suggestions
+    
+    # Validate limit
+    limit = max(1, min(limit, 50))
+    
+    try:
+        suggestions = await get_suggestions(current_user.id, limit=limit)
+        
+        logger.info(f"Returned {len(suggestions)} friend suggestions for user {current_user.id}")
+        
+        return {
+            "success": True,
+            "data": suggestions,
+            "count": len(suggestions),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get friend suggestions for {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể lấy gợi ý kết bạn. Vui lòng thử lại sau."
+        )
