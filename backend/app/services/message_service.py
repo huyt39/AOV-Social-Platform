@@ -179,6 +179,9 @@ class MessageService:
         """Build a conversation list item for display."""
         name = conv.name
         avatar_url = conv.avatar_url
+        is_online = False
+        last_active_at = None
+        other_user_id = None
         
         # For direct chats, get other user's info
         if conv.type == ConversationType.DIRECT:
@@ -192,6 +195,13 @@ class MessageService:
                 if other_user:
                     name = other_user.username
                     avatar_url = other_user.avatar_url
+                    last_active_at = other_user.last_active_at
+                    other_user_id = other_user.id
+                    # Check online status from Redis
+                    try:
+                        is_online = await redis_service.is_user_online(other_user.id)
+                    except Exception:
+                        pass  # Redis might not be connected, default to offline
         
         return ConversationListItem(
             id=conv.id,
@@ -201,6 +211,9 @@ class MessageService:
             last_message_content=conv.last_message_content,
             last_message_at=conv.last_message_at,
             unread_count=unread_map.get(conv.id, 0),
+            is_online=is_online,
+            last_active_at=last_active_at,
+            other_user_id=other_user_id,
         )
 
     # ============== Participant Management ==============

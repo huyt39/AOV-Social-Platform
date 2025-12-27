@@ -192,6 +192,9 @@ class ConversationListItem(BaseModel):
     last_message_content: Optional[str] = None
     last_message_at: Optional[datetime] = None
     unread_count: int = 0
+    is_online: bool = False  # Online status for DIRECT chats
+    last_active_at: Optional[datetime] = None  # Last active time for DIRECT chats
+    other_user_id: Optional[str] = None  # The other user's ID for DIRECT chats
 
 
 class MessagesResponse(BaseModel):
