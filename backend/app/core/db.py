@@ -27,12 +27,18 @@ async def connect_to_mongodb() -> None:
     global mongodb_client
 
     # Create MongoDB client
-    # Create MongoDB client
+    # Only use TLS if MongoDB URL contains ssl=true or tls=true
     import certifi
-    mongodb_client = AsyncIOMotorClient(
-        settings.MONGODB_URL,
-        tlsCAFile=certifi.where()
-    )
+    mongodb_url = settings.MONGODB_URL.lower()
+    use_tls = "ssl=true" in mongodb_url or "tls=true" in mongodb_url
+    
+    if use_tls:
+        mongodb_client = AsyncIOMotorClient(
+            settings.MONGODB_URL,
+            tlsCAFile=certifi.where()
+        )
+    else:
+        mongodb_client = AsyncIOMotorClient(settings.MONGODB_URL)
 
     # Initialize Beanie with document models
     await init_beanie(
