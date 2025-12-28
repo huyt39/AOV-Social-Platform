@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel, EmailStr, Field
@@ -20,9 +20,6 @@ from app.core.exceptions import (
 
 from app.models import (
     ArenaUserRegister,
-    Message,
-    ProfileVerificationData,
-    RankEnum,
     User,
     UserRole,
 )
@@ -394,15 +391,15 @@ async def update_avatar(
 
 class ProfileUpdate(BaseModel):
     """Request model for profile update."""
-    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
-    main_role: Optional[str] = None
+    username: str | None = Field(default=None, min_length=3, max_length=50)
+    main_role: str | None = None
     # Game stats from verified screenshot
-    level: Optional[int] = None
-    rank: Optional[str] = None
-    win_rate: Optional[float] = None
-    total_matches: Optional[int] = None
-    credibility_score: Optional[int] = None
-    profile_screenshot_url: Optional[str] = None
+    level: int | None = None
+    rank: str | None = None
+    win_rate: float | None = None
+    total_matches: int | None = None
+    credibility_score: int | None = None
+    profile_screenshot_url: str | None = None
 
 
 @router.patch("/me/profile")
@@ -502,5 +499,174 @@ async def update_profile(
             "role": current_user.role.value if current_user.role else "USER",
             "is_superuser": current_user.is_superuser,
         },
+    }
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request model for forgot password endpoint."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request model for reset password endpoint."""
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=40)
+
+
+class ChangePasswordRequest(BaseModel):
+    """Request model for change password endpoint."""
+    current_password: str = Field(..., min_length=8, max_length=40)
+    new_password: str = Field(..., min_length=8, max_length=40)
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+) -> dict[str, Any]:
+    """
+    Request password reset email.
+    
+    Sends a password reset email to the user if the email exists in the system.
+    For security reasons, always returns success even if email doesn't exist.
+    """
+    from app.core.config import settings
+    from app.utils import generate_password_reset_token, generate_reset_password_email, send_email
+    
+    # Find user by email
+    user = await User.find_one(User.email == request.email)
+    
+    # For security, always return success to prevent email enumeration
+    if not user:
+        logger.info(f"Password reset requested for non-existent email: {request.email}")
+        return {
+            "success": True,
+            "message": "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu",
+        }
+    
+    # Check if user is active
+    if not user.is_active:
+        logger.info(f"Password reset requested for inactive user: {request.email}")
+        return {
+            "success": True,
+            "message": "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu",
+        }
+    
+    # Generate password reset token
+    token = generate_password_reset_token(email=request.email)
+    
+    # Send email if email service is configured
+    if settings.emails_enabled:
+        try:
+            email_data = generate_reset_password_email(
+                email_to=request.email,
+                email=request.email,
+                token=token,
+            )
+            send_email(
+                email_to=request.email,
+                subject=email_data.subject,
+                html_content=email_data.html_content,
+            )
+            logger.info(f"Password reset email sent to: {request.email}")
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {request.email}: {e}")
+            raise InternalServerException(
+                error_code="EMAIL_SEND_FAILED",
+                message="Không thể gửi email. Vui lòng thử lại sau.",
+            )
+    else:
+        # In development mode, log the token
+        logger.warning(f"Email service not configured. Reset token for {request.email}: {token}")
+        logger.warning(f"Reset link: {settings.FRONTEND_HOST}/reset-password?token={token}")
+    
+    return {
+        "success": True,
+        "message": "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu",
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+) -> dict[str, Any]:
+    """
+    Reset password using token from email.
+    
+    Validates the token and updates the user's password.
+    """
+    from app.core.security import get_password_hash
+    from app.utils import verify_password_reset_token
+    
+    # Verify token and get email
+    email = verify_password_reset_token(token=request.token)
+    
+    if not email:
+        raise ValidationException(
+            error_code="INVALID_TOKEN",
+            message="Token không hợp lệ hoặc đã hết hạn",
+        )
+    
+    # Find user by email
+    user = await User.find_one(User.email == email)
+    
+    if not user:
+        raise NotFoundException(
+            error_code="USER_NOT_FOUND",
+            message="Người dùng không tồn tại",
+        )
+    
+    if not user.is_active:
+        raise ForbiddenException(
+            error_code="ACCOUNT_INACTIVE",
+            message="Tài khoản đã bị vô hiệu hóa",
+        )
+    
+    # Update password
+    user.hashed_password = get_password_hash(request.new_password)
+    await user.save()
+    
+    logger.info(f"Password reset successful for user: {user.email}")
+    
+    return {
+        "success": True,
+        "message": "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.",
+    }
+
+
+@router.patch("/me/password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Change password for authenticated user.
+    
+    Requires current password for verification and new password.
+    """
+    from app.core.security import get_password_hash, verify_password
+    
+    # Verify current password
+    if not verify_password(request.current_password, current_user.hashed_password):
+        raise ValidationException(
+            error_code="INCORRECT_PASSWORD",
+            message="Mật khẩu hiện tại không đúng",
+        )
+    
+    # Check if new password is different from current
+    if request.current_password == request.new_password:
+        raise ValidationException(
+            error_code="SAME_PASSWORD",
+            message="Mật khẩu mới phải khác mật khẩu hiện tại",
+        )
+    
+    # Update password
+    current_user.hashed_password = get_password_hash(request.new_password)
+    await current_user.save()
+    
+    logger.info(f"Password changed successfully for user: {current_user.email}")
+    
+    return {
+        "success": True,
+        "message": "Đổi mật khẩu thành công",
     }
 
