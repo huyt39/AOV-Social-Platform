@@ -19,8 +19,10 @@ from app.models import (
     ForumCommentPublic, ForumCommentsResponse, ForumCommentLike, ForumCommentAuthor,
     ForumCommentStatus, ThreadStatus,
     Report, ReportCreate, ReportPublic, ReportTargetType,
-    Message,
+    # Post model for reports
+    Post,
 )
+from app.models.base import Message  # Simple response message (avoid conflict with conversation.Message)
 
 logger = logging.getLogger(__name__)
 
@@ -635,7 +637,7 @@ async def create_report(
     report_in: ReportCreate,
     current_user: CurrentUser,
 ):
-    """Report content (thread, comment, or user)."""
+    """Report content (thread, comment, user, or post)."""
     # Verify target exists
     if report_in.target_type == ReportTargetType.THREAD:
         target = await ForumThread.get(report_in.target_id)
@@ -643,6 +645,8 @@ async def create_report(
         target = await ForumComment.get(report_in.target_id)
     elif report_in.target_type == ReportTargetType.USER:
         target = await User.get(report_in.target_id)
+    elif report_in.target_type == ReportTargetType.POST:
+        target = await Post.get(report_in.target_id)
     else:
         target = None
     

@@ -13,10 +13,12 @@ from app.models import (
     ForumCategory, ForumCategoryCreate, ForumCategoryUpdate, ForumCategoryPublic,
     ForumThread, ForumComment, ForumCommentStatus, ThreadStatus,
     Report, ReportStatus, ReportPublic, ReportsResponse, ReportResolve,
-    ReportTargetType,
+    ReportTargetType, ReportAction,
     AdminStats,
-    Message,
+    # Post model
+    Post,
 )
+from app.models.base import Message  # Simple response message (avoid conflict)
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +329,10 @@ async def get_reports(
             target_user = await User.get(report.target_id)
             if target_user:
                 target_preview = f"@{target_user.username}"
+        elif report.target_type == ReportTargetType.POST:
+            post = await Post.get(report.target_id)
+            if post:
+                target_preview = (post.content[:100] if post.content else "[Bài viết không có nội dung]")
         
         data.append(ReportPublic(
             id=report.id,
@@ -352,7 +358,7 @@ async def resolve_report(
     resolve_in: ReportResolve,
     current_user: ModeratorUser,
 ):
-    """Resolve or dismiss a report."""
+    """Resolve or dismiss a report with action options."""
     report = await Report.get(report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -360,26 +366,91 @@ async def resolve_report(
     if report.status != ReportStatus.PENDING:
         raise HTTPException(status_code=400, detail="Report already resolved")
     
+    action_taken = "no action"
+    
+    # Execute the selected action if status is RESOLVED
+    if resolve_in.status == ReportStatus.RESOLVED and resolve_in.action:
+        if resolve_in.action == ReportAction.HIDE_CONTENT:
+            # Hide the content
+            if report.target_type == ReportTargetType.THREAD:
+                thread = await ForumThread.get(report.target_id)
+                if thread:
+                    thread.status = ThreadStatus.HIDDEN
+                    await thread.save()
+                    action_taken = "content hidden"
+            elif report.target_type == ReportTargetType.COMMENT:
+                comment = await ForumComment.get(report.target_id)
+                if comment:
+                    comment.status = ForumCommentStatus.HIDDEN
+                    await comment.save()
+                    action_taken = "content hidden"
+            elif report.target_type == ReportTargetType.POST:
+                post = await Post.get(report.target_id)
+                if post:
+                    post.is_hidden = True
+                    await post.save()
+                    action_taken = "content hidden"
+                    
+        elif resolve_in.action == ReportAction.DELETE_CONTENT:
+            # Soft delete content
+            if report.target_type == ReportTargetType.THREAD:
+                thread = await ForumThread.get(report.target_id)
+                if thread:
+                    # Update category count
+                    category = await ForumCategory.get(thread.category_id)
+                    if category:
+                        category.thread_count = max(0, category.thread_count - 1)
+                        await category.save()
+                    thread.status = ThreadStatus.HIDDEN
+                    await thread.save()
+                    action_taken = "content deleted"
+            elif report.target_type == ReportTargetType.COMMENT:
+                comment = await ForumComment.get(report.target_id)
+                if comment:
+                    comment.status = ForumCommentStatus.DELETED
+                    await comment.save()
+                    action_taken = "content deleted"
+            elif report.target_type == ReportTargetType.POST:
+                post = await Post.get(report.target_id)
+                if post:
+                    await post.delete()
+                    action_taken = "content deleted"
+                    
+        elif resolve_in.action == ReportAction.WARN_USER:
+            # Just record the warning in moderator note
+            action_taken = "user warned"
+            
+        elif resolve_in.action == ReportAction.IGNORE:
+            action_taken = "ignored"
+    
+    # Update the current report
     report.status = resolve_in.status
     report.moderator_id = current_user.id
     report.moderator_note = resolve_in.moderator_note
     report.resolved_at = datetime.now(UTC)
     await report.save()
     
-    # If resolved (not dismissed), take action on content
-    if resolve_in.status == ReportStatus.RESOLVED:
-        if report.target_type == ReportTargetType.THREAD:
-            thread = await ForumThread.get(report.target_id)
-            if thread:
-                thread.status = ThreadStatus.HIDDEN
-                await thread.save()
-        elif report.target_type == ReportTargetType.COMMENT:
-            comment = await ForumComment.get(report.target_id)
-            if comment:
-                comment.status = ForumCommentStatus.HIDDEN
-                await comment.save()
+    # Auto-resolve other pending reports for the same target
+    other_reports = await Report.find(
+        Report.target_type == report.target_type,
+        Report.target_id == report.target_id,
+        Report.status == ReportStatus.PENDING,
+        Report.id != report_id
+    ).to_list()
     
-    action = "resolved" if resolve_in.status == ReportStatus.RESOLVED else "dismissed"
-    logger.info(f"Report {report_id} {action} by {current_user.username}")
+    resolved_count = 0
+    for other_report in other_reports:
+        other_report.status = resolve_in.status
+        other_report.moderator_id = current_user.id
+        other_report.moderator_note = f"Auto-resolved: {resolve_in.moderator_note or 'Same target handled'}"
+        other_report.resolved_at = datetime.now(UTC)
+        await other_report.save()
+        resolved_count += 1
     
-    return Message(message=f"Report {action}")
+    status_text = "resolved" if resolve_in.status == ReportStatus.RESOLVED else "dismissed"
+    extra_msg = f" (+{resolved_count} related reports)" if resolved_count > 0 else ""
+    action_msg = f" ({action_taken})" if action_taken != "no action" else ""
+    
+    logger.info(f"Report {report_id} {status_text} by {current_user.username}: {action_taken}{extra_msg}")
+    
+    return Message(message=f"Report {status_text}{action_msg}{extra_msg}")

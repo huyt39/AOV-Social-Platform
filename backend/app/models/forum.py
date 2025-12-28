@@ -31,6 +31,7 @@ class ReportTargetType(str, Enum):
     THREAD = "THREAD"
     COMMENT = "COMMENT"
     USER = "USER"
+    POST = "POST"  # Feed posts
 
 
 class ReportStatus(str, Enum):
@@ -351,9 +352,18 @@ class ReportsResponse(BaseModel):
     pending_count: int = 0
 
 
+class ReportAction(str, Enum):
+    """Action to take when resolving a report."""
+    IGNORE = "IGNORE"           # Dismiss - no action taken
+    HIDE_CONTENT = "HIDE_CONTENT"     # Hide the reported content
+    DELETE_CONTENT = "DELETE_CONTENT"  # Delete the reported content (soft delete)
+    WARN_USER = "WARN_USER"       # Warn the content author
+
+
 class ReportResolve(BaseModel):
     """Schema for resolving a report."""
     status: ReportStatus  # RESOLVED or DISMISSED
+    action: Optional[ReportAction] = ReportAction.IGNORE  # Action to take
     moderator_note: Optional[str] = Field(default=None, max_length=500)
 
 
