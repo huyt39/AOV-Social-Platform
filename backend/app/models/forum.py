@@ -337,6 +337,7 @@ class ReportPublic(BaseModel):
     target_type: ReportTargetType
     target_id: str
     target_preview: Optional[str] = None  # Preview of reported content
+    thread_id: Optional[str] = None  # Thread ID for COMMENT reports (for navigation)
     reason: str
     status: ReportStatus
     moderator_id: Optional[str] = None

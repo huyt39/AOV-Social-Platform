@@ -315,8 +315,9 @@ async def get_reports(
     for report in reports:
         reporter = await User.get(report.reporter_id)
         
-        # Get target preview
+        # Get target preview and thread_id (for comments)
         target_preview = None
+        thread_id = None
         if report.target_type == ReportTargetType.THREAD:
             thread = await ForumThread.get(report.target_id)
             if thread:
@@ -325,6 +326,7 @@ async def get_reports(
             comment = await ForumComment.get(report.target_id)
             if comment:
                 target_preview = comment.content[:100]
+                thread_id = comment.thread_id  # Store thread_id for navigation
         elif report.target_type == ReportTargetType.USER:
             target_user = await User.get(report.target_id)
             if target_user:
@@ -341,6 +343,7 @@ async def get_reports(
             target_type=report.target_type,
             target_id=report.target_id,
             target_preview=target_preview,
+            thread_id=thread_id,
             reason=report.reason,
             status=report.status,
             moderator_id=report.moderator_id,
