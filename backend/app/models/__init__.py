@@ -117,6 +117,7 @@ from .forum import (
     ForumCommentStatus,
     ReportTargetType,
     ReportStatus,
+    ReportAction,
     # Category
     ForumCategory,
     ForumCategoryCreate,
@@ -290,6 +291,7 @@ __all__ = [
     "ForumCommentStatus",
     "ReportTargetType",
     "ReportStatus",
+    "ReportAction",
     "ForumCategory",
     "ForumCategoryCreate",
     "ForumCategoryUpdate",
