@@ -513,6 +513,12 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, max_length=40)
 
 
+class ChangePasswordRequest(BaseModel):
+    """Request model for change password endpoint."""
+    current_password: str = Field(..., min_length=8, max_length=40)
+    new_password: str = Field(..., min_length=8, max_length=40)
+
+
 @router.post("/forgot-password")
 async def forgot_password(
     request: ForgotPasswordRequest,
@@ -624,5 +630,43 @@ async def reset_password(
     return {
         "success": True,
         "message": "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.",
+    }
+
+
+@router.patch("/me/password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Change password for authenticated user.
+    
+    Requires current password for verification and new password.
+    """
+    from app.core.security import get_password_hash, verify_password
+    
+    # Verify current password
+    if not verify_password(request.current_password, current_user.hashed_password):
+        raise ValidationException(
+            error_code="INCORRECT_PASSWORD",
+            message="Mật khẩu hiện tại không đúng",
+        )
+    
+    # Check if new password is different from current
+    if request.current_password == request.new_password:
+        raise ValidationException(
+            error_code="SAME_PASSWORD",
+            message="Mật khẩu mới phải khác mật khẩu hiện tại",
+        )
+    
+    # Update password
+    current_user.hashed_password = get_password_hash(request.new_password)
+    await current_user.save()
+    
+    logger.info(f"Password changed successfully for user: {current_user.email}")
+    
+    return {
+        "success": True,
+        "message": "Đổi mật khẩu thành công",
     }
 
