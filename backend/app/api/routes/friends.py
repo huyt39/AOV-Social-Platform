@@ -18,6 +18,8 @@ from app.models import (
     FriendsListPublic,
     User,
     utc_now,
+    Notification,
+    NotificationType,
 )
 from app.services.redis_client import redis_service
 
@@ -87,6 +89,16 @@ async def send_friend_request(
         status=FriendshipStatus.PENDING,
     )
     await friendship.insert()
+
+    # Create notification for the addressee
+    notification = Notification(
+        user_id=user_id,
+        actor_id=current_user.id,
+        type=NotificationType.FRIEND_REQUEST,
+        friendship_id=friendship.id,
+        content=f"{current_user.username} đã gửi lời mời kết bạn",
+    )
+    await notification.insert()
 
     logger.info(f"Friend request sent: {current_user.username} -> {target_user.username}")
 

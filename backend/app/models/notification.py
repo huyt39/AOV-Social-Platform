@@ -21,6 +21,8 @@ class NotificationType(str, Enum):
     TEAM_JOIN_REQUEST = "team_join_request"  # Someone requested to join your team
     TEAM_REQUEST_APPROVED = "team_request_approved"  # Your request was approved
     TEAM_REQUEST_REJECTED = "team_request_rejected"  # Your request was rejected
+    # Friend notifications
+    FRIEND_REQUEST = "friend_request"  # Someone sent you a friend request
 
 
 class Notification(Document):
@@ -32,6 +34,7 @@ class Notification(Document):
     post_id: Optional[str] = None  # Related post (if applicable)
     comment_id: Optional[str] = None  # Related comment (if applicable)
     team_id: Optional[str] = None  # Related team (if applicable)
+    friendship_id: Optional[str] = None  # Related friendship (if applicable)
     content: str  # Preview text for the notification
     is_read: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utc_now)
@@ -57,6 +60,8 @@ class NotificationPublic(BaseModel):
     type: NotificationType
     post_id: Optional[str] = None
     comment_id: Optional[str] = None
+    friendship_id: Optional[str] = None
+    team_id: Optional[str] = None
     content: str
     is_read: bool
     created_at: datetime
