@@ -1,262 +1,353 @@
-# Full Stack FastAPI 
+<p align="center">
+  <img src="img/logo.png" alt="ArenaHub Logo" width="200"/>
+</p>
 
-<a href="https://github.com/fastapi/full-stack-fastapi-template/actions?query=workflow%3ATest" target="_blank"><img src="https://github.com/fastapi/full-stack-fastapi-template/workflows/Test/badge.svg" alt="Test"></a>
-<a href="https://coverage-badge.samuelcolvin.workers.dev/redirect/fastapi/full-stack-fastapi-template" target="_blank"><img src="https://coverage-badge.samuelcolvin.workers.dev/fastapi/full-stack-fastapi-template.svg" alt="Coverage"></a>
+<h1 align="center">🎮 ArenaHub - AOV Social Platform</h1>
 
-## 🚀 Local Development Quickstart
+<p align="center">
+  <strong>Nền tảng mạng xã hội dành cho cộng đồng chơi game Arena of Valor (Liên Quân Mobile)</strong>
+</p>
 
-### 1. Start Docker services
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#tech-stack">Tech Stack</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#development">Development</a> •
+  <a href="#deployment">Deployment</a> •
+  <a href="#cicd">CI/CD</a> •
+  <a href="#contributors">Contributors</a>
+</p>
+
+---
+
+## 📋 Giới thiệu
+
+**ArenaHub** là nền tảng mạng xã hội toàn diện được xây dựng dành riêng cho cộng đồng game thủ Liên Quân Mobile (Arena of Valor). Nền tảng cho phép người chơi kết nối, chia sẻ, tìm đồng đội và nhận tư vấn từ AI Coach.
+
+---
+
+## ✨ Features
+
+### 🔐 Xác thực & Hồ sơ người dùng
+- Đăng ký với xác minh hồ sơ game tự động qua **Gemini Vision AI**
+- Trích xuất thông tin: Level, Rank, Win Rate, Tổng trận, Điểm tín nhiệm
+- JWT Authentication & Password Recovery qua email
+
+### 📱 Mạng xã hội
+- **Feed bài viết** với ảnh và video
+- **Thả tim, bình luận, chia sẻ** bài viết
+- **Reels** - Video ngắn với HLS streaming
+- **Hệ thống bạn bè** với gợi ý thông minh
+
+### 💬 Tin nhắn Real-time
+- Chat 1-1 và chat nhóm
+- Gửi ảnh, video trong tin nhắn
+- Trạng thái online và typing indicator
+
+### 🎮 Tìm đội (LFG - Looking for Group)
+- Tạo phòng chơi theo rank và chế độ game
+- Gửi yêu cầu tham gia với tin nhắn
+- Tự động tạo group chat cho team
+
+### 📰 Diễn đàn Forum
+- Tạo chủ đề thảo luận theo danh mục
+- Like, comment trong forum
+- Hệ thống báo cáo nội dung vi phạm
+
+### 🤖 AI Coach Chatbot
+- Tư vấn tướng và cách chơi
+- Sử dụng **RAG (Retrieval-Augmented Generation)**
+- Lưu trữ lịch sử hội thoại
+
+### 🔔 Thông báo Real-time
+- Thông báo tương tác (like, comment, share)
+- Thông báo tìm đội và kết bạn
+- Thông báo xử lý report từ Admin
+
+### 👨‍💼 Admin Dashboard
+- Quản lý người dùng và phân quyền
+- Kiểm duyệt báo cáo nội dung
+- Thống kê hệ thống với biểu đồ trực quan
+
+---
+
+## 🛠 Tech Stack
+
+### Backend
+| Công nghệ | Mô tả |
+|-----------|-------|
+| ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white) | Python Web Framework |
+| ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat&logo=mongodb&logoColor=white) | NoSQL Database |
+| ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white) | Cache & Pub/Sub |
+| ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=flat&logo=rabbitmq&logoColor=white) | Message Queue |
+| ![Beanie](https://img.shields.io/badge/Beanie-ODM-blue) | MongoDB ODM |
+
+### Frontend
+| Công nghệ | Mô tả |
+|-----------|-------|
+| ![React](https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black) | UI Library |
+| ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white) | Type Safety |
+| ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white) | Build Tool |
+| ![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=flat) | Data Visualization |
+
+### Infrastructure
+| Công nghệ | Mô tả |
+|-----------|-------|
+| ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) | Containerization |
+| ![AWS ECS](https://img.shields.io/badge/AWS_ECS-FF9900?style=flat&logo=amazon-aws&logoColor=white) | Container Orchestration |
+| ![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat&logo=nginx&logoColor=white) | Reverse Proxy |
+| ![S3](https://img.shields.io/badge/S3-569A31?style=flat&logo=amazon-s3&logoColor=white) | Object Storage |
+
+### AI/ML
+| Công nghệ | Mô tả |
+|-----------|-------|
+| ![Google Gemini](https://img.shields.io/badge/Gemini-4285F4?style=flat&logo=google&logoColor=white) | Vision API & LLM |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+
+- Python 3.11+
+- MongoDB, Redis, RabbitMQ (hoặc dùng Docker)
+
+### 1. Clone repository
+
+```bash
+git clone https://github.com/huyt39/AOV-Social-Platform.git
+cd AOV-Social-Platform
+```
+
+### 2. Cấu hình environment
+
+```bash
+cp .env.example .env
+# Chỉnh sửa file .env với các thông tin cần thiết
+```
+
+### 3. Khởi động Docker services
+
 ```bash
 docker compose up -d video-worker rabbitmq redis mongodb
 ```
 
-### 2. Start Backend
+### 4. Chạy Backend
+
 ```bash
 cd backend
-uv sync
-source .venv/bin/activate
+uv sync                           # Cài đặt dependencies
+source .venv/bin/activate         # Kích hoạt virtual environment
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 3. Start Frontend (new terminal)
+### 5. Chạy Frontend (terminal mới)
+
 ```bash
 cd frontend
-npm run dev
+npm install                       # Cài đặt dependencies
+npm run dev                       # Chạy development server
+```
+
+### 6. Truy cập ứng dụng
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| RabbitMQ Management | http://localhost:15672 |
+
+---
+
+## 💻 Development
+
+### Cấu trúc thư mục
+
+```
+AOV-Social-Platform/
+├── backend/                 # FastAPI Backend
+│   ├── app/
+│   │   ├── api/            # API Routes
+│   │   ├── models/         # Pydantic/Beanie Models
+│   │   ├── services/       # Business Logic
+│   │   ├── llm/            # AI/LLM Integration
+│   │   └── core/           # Configuration
+│   └── requirements.txt
+├── frontend/               # React Frontend
+│   ├── components/         # React Components
+│   ├── contexts/           # React Contexts
+│   ├── types/              # TypeScript Types
+│   └── package.json
+├── video-worker/           # Video Processing Worker
+├── docker-compose.yml      # Docker Compose config
+└── .github/workflows/      # CI/CD Pipelines
+```
+
+### Pre-commit Hooks
+
+Dự án sử dụng pre-commit để đảm bảo code quality:
+
+```bash
+# Cài đặt pre-commit
+uv run pre-commit install
+
+# Chạy thủ công
+uv run pre-commit run --all-files
+```
+
+### Code Linting
+
+- **Backend**: Ruff (linting + formatting)
+- **Frontend**: ESLint + Prettier
+
+---
+
+## 🌐 Deployment
+
+### Kiến trúc Production
+
+```mermaid
+flowchart TB
+    Internet(["🌐 Internet"])
+    Nginx["Nginx\n(Reverse Proxy + SSL)"]
+    Frontend["Frontend\n(Static/Nginx)"]
+    Backend["Backend API\n(ECS Fargate)"]
+    MongoDB[("MongoDB")]
+    Redis[("Redis")]
+    RabbitMQ["RabbitMQ"]
+    VideoWorker["Video Worker\n(FFmpeg + HLS)"]
+
+    Internet --> Nginx
+    Nginx --> Frontend
+    Nginx --> Backend
+    Backend --> MongoDB
+    Backend --> Redis
+    Backend --> RabbitMQ
+    RabbitMQ --> VideoWorker
+```
+
+### Deploy với Docker Compose
+
+```bash
+# Production deployment
+docker compose -f docker-compose.yml up -d
+```
+
+### Environment Variables
+
+| Variable | Mô tả |
+|----------|-------|
+| `SECRET_KEY` | JWT Secret Key |
+| `MONGODB_URL` | MongoDB connection string |
+| `REDIS_URL` | Redis connection string |
+| `RABBITMQ_URL` | RabbitMQ connection string |
+| `S3_ACCESS_KEY` | S3 Access Key |
+| `S3_SECRET_KEY` | S3 Secret Key |
+| `GEMINI_API_KEY` | Google Gemini API Key |
+| `IMGBB_API_KEY` | ImgBB API Key (cho upload ảnh) |
+
+---
+
+## 🔄 CI/CD
+
+### GitHub Actions Pipeline
+
+Dự án sử dụng GitHub Actions để tự động hóa quy trình CI/CD:
+
+```yaml
+Workflow: Deploy to Amazon ECS
+├── Trigger: Push to main branch
+├── Steps:
+│   ├── 1. Checkout code
+│   ├── 2. Login to Docker Hub
+│   ├── 3. Configure AWS credentials
+│   ├── 4. Build & Push Backend Docker image
+│   ├── 5. Update ECS Task Definition
+│   ├── 6. Deploy to ECS Fargate
+│   └── 7. Update Nginx with new Backend IP
+```
+
+### Required Secrets (GitHub)
+
+| Secret | Mô tả |
+|--------|-------|
+| `DOCKERHUB_USERNAME` | Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub access token |
+| `AWS_ACCESS_KEY_ID` | AWS Access Key |
+| `AWS_SECRET_ACCESS_KEY` | AWS Secret Key |
+| `NGINX_EC2_HOST` | EC2 Instance public IP |
+| `NGINX_EC2_SSH_KEY` | SSH private key cho EC2 |
+
+### Deployment Flow
+
+```mermaid
+flowchart LR
+    A["Developer Push"] --> B["GitHub Actions"]
+    B --> C["Docker Build"]
+    C --> D["Push to Docker Hub"]
+    D --> E["ECS Task Definition Update"]
+    E --> F["Deploy to ECS Fargate"]
+    F --> G["Get Backend Private IP"]
+    G --> H["Update Nginx Configuration"]
+    H --> I["✅ Production Live"]
 ```
 
 ---
 
-## Technology Stack and Features
-
-- ⚡ [**FastAPI**](https://fastapi.tiangolo.com) for the Python backend API.
-    - 🧰 [SQLModel](https://sqlmodel.tiangolo.com) for the Python SQL database interactions (ORM).
-    - 🔍 [Pydantic](https://docs.pydantic.dev), used by FastAPI, for the data validation and settings management.
-    - 💾 [PostgreSQL](https://www.postgresql.org) as the SQL database.
-- 🚀 [React](https://react.dev) for the frontend.
-    - 💃 Using TypeScript, hooks, Vite, and other parts of a modern frontend stack.
-    - 🎨 [Chakra UI](https://chakra-ui.com) for the frontend components.
-    - 🤖 An automatically generated frontend client.
-    - 🧪 [Playwright](https://playwright.dev) for End-to-End testing.
-    - 🦇 Dark mode support.
-- 🐋 [Docker Compose](https://www.docker.com) for development and production.
-- 🔒 Secure password hashing by default.
-- 🔑 JWT (JSON Web Token) authentication.
-- 📫 Email based password recovery.
-- ✅ Tests with [Pytest](https://pytest.org).
-- 📞 [Traefik](https://traefik.io) as a reverse proxy / load balancer.
-- 🚢 Deployment instructions using Docker Compose, including how to set up a frontend Traefik proxy to handle automatic HTTPS certificates.
-- 🏭 CI (continuous integration) and CD (continuous deployment) based on GitHub Actions.
-
-### Dashboard Login
-
-[![API docs](img/login.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-### Dashboard - Admin
-
-[![API docs](img/dashboard.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-### Dashboard - Create User
-
-[![API docs](img/dashboard-create.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-### Dashboard - Items
-
-[![API docs](img/dashboard-items.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-### Dashboard - User Settings
-
-[![API docs](img/dashboard-user-settings.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-### Dashboard - Dark Mode
-
-[![API docs](img/dashboard-dark.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-### Interactive API Documentation
-
-[![API docs](img/docs.png)](https://github.com/fastapi/full-stack-fastapi-template)
-
-## How To Use It
-
-You can **just fork or clone** this repository and use it as is.
-
-✨ It just works. ✨
-
-### How to Use a Private Repository
-
-If you want to have a private repository, GitHub won't allow you to simply fork it as it doesn't allow changing the visibility of forks.
-
-But you can do the following:
-
-- Create a new GitHub repo, for example `my-full-stack`.
-- Clone this repository manually, set the name with the name of the project you want to use, for example `my-full-stack`:
-
-```bash
-git clone git@github.com:fastapi/full-stack-fastapi-template.git my-full-stack
-```
-
-- Enter into the new directory:
-
-```bash
-cd my-full-stack
-```
-
-- Set the new origin to your new repository, copy it from the GitHub interface, for example:
-
-```bash
-git remote set-url origin git@github.com:octocat/my-full-stack.git
-```
-
-- Add this repo as another "remote" to allow you to get updates later:
-
-```bash
-git remote add upstream git@github.com:fastapi/full-stack-fastapi-template.git
-```
-
-- Push the code to your new repository:
-
-```bash
-git push -u origin master
-```
-
-### Update From the Original Template
-
-After cloning the repository, and after doing changes, you might want to get the latest changes from this original template.
-
-- Make sure you added the original repository as a remote, you can check it with:
-
-```bash
-git remote -v
-
-origin    git@github.com:octocat/my-full-stack.git (fetch)
-origin    git@github.com:octocat/my-full-stack.git (push)
-upstream    git@github.com:fastapi/full-stack-fastapi-template.git (fetch)
-upstream    git@github.com:fastapi/full-stack-fastapi-template.git (push)
-```
-
-- Pull the latest changes without merging:
-
-```bash
-git pull --no-commit upstream master
-```
-
-This will download the latest changes from this template without committing them, that way you can check everything is right before committing.
-
-- If there are conflicts, solve them in your editor.
-
-- Once you are done, commit the changes:
-
-```bash
-git merge --continue
-```
-
-### Configure
-
-You can then update configs in the `.env` files to customize your configurations.
-
-Before deploying it, make sure you change at least the values for:
-
-- `SECRET_KEY`
-- `FIRST_SUPERUSER_PASSWORD`
-- `POSTGRES_PASSWORD`
-
-You can (and should) pass these as environment variables from secrets.
-
-Read the [deployment.md](./deployment.md) docs for more details.
-
-### Generate Secret Keys
-
-Some environment variables in the `.env` file have a default value of `changethis`.
-
-You have to change them with a secret key, to generate secret keys you can run the following command:
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-Copy the content and use that as password / secret key. And run that again to generate another secure key.
-
-## How To Use It - Alternative With Copier
-
-This repository also supports generating a new project using [Copier](https://copier.readthedocs.io).
-
-It will copy all the files, ask you configuration questions, and update the `.env` files with your answers.
-
-### Install Copier
-
-You can install Copier with:
-
-```bash
-pip install copier
-```
-
-Or better, if you have [`pipx`](https://pipx.pypa.io/), you can run it with:
-
-```bash
-pipx install copier
-```
-
-**Note**: If you have `pipx`, installing copier is optional, you could run it directly.
-
-### Generate a Project With Copier
-
-Decide a name for your new project's directory, you will use it below. For example, `my-awesome-project`.
-
-Go to the directory that will be the parent of your project, and run the command with your project's name:
-
-```bash
-copier copy https://github.com/fastapi/full-stack-fastapi-template my-awesome-project --trust
-```
-
-If you have `pipx` and you didn't install `copier`, you can run it directly:
-
-```bash
-pipx run copier copy https://github.com/fastapi/full-stack-fastapi-template my-awesome-project --trust
-```
-
-**Note** the `--trust` option is necessary to be able to execute a [post-creation script](https://github.com/fastapi/full-stack-fastapi-template/blob/master/.copier/update_dotenv.py) that updates your `.env` files.
-
-### Input Variables
-
-Copier will ask you for some data, you might want to have at hand before generating the project.
-
-But don't worry, you can just update any of that in the `.env` files afterwards.
-
-The input variables, with their default values (some auto generated) are:
-
-- `project_name`: (default: `"FastAPI Project"`) The name of the project, shown to API users (in .env).
-- `stack_name`: (default: `"fastapi-project"`) The name of the stack used for Docker Compose labels and project name (no spaces, no periods) (in .env).
-- `secret_key`: (default: `"changethis"`) The secret key for the project, used for security, stored in .env, you can generate one with the method above.
-- `first_superuser`: (default: `"admin@example.com"`) The email of the first superuser (in .env).
-- `first_superuser_password`: (default: `"changethis"`) The password of the first superuser (in .env).
-- `smtp_host`: (default: "") The SMTP server host to send emails, you can set it later in .env.
-- `smtp_user`: (default: "") The SMTP server user to send emails, you can set it later in .env.
-- `smtp_password`: (default: "") The SMTP server password to send emails, you can set it later in .env.
-- `emails_from_email`: (default: `"info@example.com"`) The email account to send emails from, you can set it later in .env.
-- `postgres_password`: (default: `"changethis"`) The password for the PostgreSQL database, stored in .env, you can generate one with the method above.
-- `sentry_dsn`: (default: "") The DSN for Sentry, if you are using it, you can set it later in .env.
-
-## Backend Development
-
-Backend docs: [backend/README.md](./backend/README.md).
-
-## Frontend Development
-
-Frontend docs: [frontend/README.md](./frontend/README.md).
-
-## Deployment
-
-Deployment docs: [deployment.md](./deployment.md).
-
-## Development
-
-General development docs: [development.md](./development.md).
-
-This includes using Docker Compose, custom local domains, `.env` configurations, etc.
-
-## Release Notes
-
-Check the file [release-notes.md](./release-notes.md).
-
-## License
-
-The Full Stack FastAPI Template is licensed under the terms of the MIT license.
+## 👥 Contributors
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/linhgrr">
+        <img src="https://github.com/linhgrr.png" width="100px;" alt="linhgrr"/>
+        <br />
+        <sub><b>linhgrr</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/cuonggpham">
+        <img src="https://github.com/cuonggpham.png" width="100px;" alt="cuonggpham"/>
+        <br />
+        <sub><b>cuonggpham</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/huyt39">
+        <img src="https://github.com/huyt39.png" width="100px;" alt="huyt39"/>
+        <br />
+        <sub><b>huyt39</b></sub>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/ktoan911">
+        <img src="https://github.com/ktoan911.png" width="100px;" alt="ktoan911"/>
+        <br />
+        <sub><b>ktoan911</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [React](https://react.dev/) - UI Library
+- [MongoDB](https://www.mongodb.com/) - NoSQL Database
+- [Google Gemini](https://ai.google.dev/) - AI Vision & LLM
+
+---
+
+<p align="center">
+  Made with ❤️ by Liqi88 Team 
+</p>
