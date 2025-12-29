@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
   <a href="#tech-stack">Tech Stack</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#development">Development</a> •
@@ -23,51 +22,6 @@
 ## 📋 Giới thiệu
 
 **ArenaHub** là nền tảng mạng xã hội toàn diện được xây dựng dành riêng cho cộng đồng game thủ Liên Quân Mobile (Arena of Valor). Nền tảng cho phép người chơi kết nối, chia sẻ, tìm đồng đội và nhận tư vấn từ AI Coach.
-
----
-
-## ✨ Features
-
-### 🔐 Xác thực & Hồ sơ người dùng
-- Đăng ký với xác minh hồ sơ game tự động qua **Gemini Vision AI**
-- Trích xuất thông tin: Level, Rank, Win Rate, Tổng trận, Điểm tín nhiệm
-- JWT Authentication & Password Recovery qua email
-
-### 📱 Mạng xã hội
-- **Feed bài viết** với ảnh và video
-- **Thả tim, bình luận, chia sẻ** bài viết
-- **Reels** - Video ngắn với HLS streaming
-- **Hệ thống bạn bè** với gợi ý thông minh
-
-### 💬 Tin nhắn Real-time
-- Chat 1-1 và chat nhóm
-- Gửi ảnh, video trong tin nhắn
-- Trạng thái online và typing indicator
-
-### 🎮 Tìm đội (LFG - Looking for Group)
-- Tạo phòng chơi theo rank và chế độ game
-- Gửi yêu cầu tham gia với tin nhắn
-- Tự động tạo group chat cho team
-
-### 📰 Diễn đàn Forum
-- Tạo chủ đề thảo luận theo danh mục
-- Like, comment trong forum
-- Hệ thống báo cáo nội dung vi phạm
-
-### 🤖 AI Coach Chatbot
-- Tư vấn tướng và cách chơi
-- Sử dụng **RAG (Retrieval-Augmented Generation)**
-- Lưu trữ lịch sử hội thoại
-
-### 🔔 Thông báo Real-time
-- Thông báo tương tác (like, comment, share)
-- Thông báo tìm đội và kết bạn
-- Thông báo xử lý report từ Admin
-
-### 👨‍💼 Admin Dashboard
-- Quản lý người dùng và phân quyền
-- Kiểm duyệt báo cáo nội dung
-- Thống kê hệ thống với biểu đồ trực quan
 
 ---
 
@@ -283,15 +237,23 @@ Workflow: Deploy to Amazon ECS
 ### Deployment Flow
 
 ```mermaid
-flowchart LR
-    A["Developer Push"] --> B["GitHub Actions"]
-    B --> C["Docker Build"]
-    C --> D["Push to Docker Hub"]
-    D --> E["ECS Task Definition Update"]
-    E --> F["Deploy to ECS Fargate"]
-    F --> G["Get Backend Private IP"]
-    G --> H["Update Nginx Configuration"]
-    H --> I["✅ Production Live"]
+flowchart TB
+    subgraph Build["🔨 Build Phase"]
+        A["Developer Push"] --> B["GitHub Actions"]
+        B --> C["Docker Build"]
+        C --> D["Push to Docker Hub"]
+    end
+    
+    subgraph Deploy["🚀 Deploy Phase"]
+        D --> E["ECS Task Definition Update"]
+        E --> F["Deploy to ECS Fargate"]
+    end
+    
+    subgraph Configure["⚙️ Configure Phase"]
+        F --> G["Get Backend Private IP"]
+        G --> H["Update Nginx Configuration"]
+        H --> I["✅ Production Live"]
+    end
 ```
 
 ---
