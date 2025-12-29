@@ -370,10 +370,19 @@ class ReportResolve(BaseModel):
 
 # ============== ADMIN STATS ==============
 
+class DailyActivity(BaseModel):
+    """Daily activity data for charts."""
+    date: str  # Format: YYYY-MM-DD
+    users: int = 0
+    threads: int = 0
+    comments: int = 0
+
+
 class AdminStats(BaseModel):
     """Admin dashboard statistics."""
     total_users: int = 0
     users_by_role: dict[str, int] = Field(default_factory=dict)
+    users_by_rank: dict[str, int] = Field(default_factory=dict)
     total_categories: int = 0
     total_threads: int = 0
     total_forum_comments: int = 0
@@ -382,3 +391,8 @@ class AdminStats(BaseModel):
     new_users_today: int = 0
     new_threads_today: int = 0
     new_comments_today: int = 0
+    # Chart data
+    activity_last_7_days: list[DailyActivity] = Field(default_factory=list)
+    reports_by_type: dict[str, int] = Field(default_factory=dict)
+
+

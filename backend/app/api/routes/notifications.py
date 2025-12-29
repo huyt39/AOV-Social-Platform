@@ -51,6 +51,7 @@ async def enrich_notification(notification: Notification) -> NotificationPublic:
         comment_id=notification.comment_id,
         friendship_id=notification.friendship_id,
         team_id=notification.team_id,
+        report_id=notification.report_id,
         content=notification.content,
         is_read=notification.is_read,
         created_at=notification.created_at,

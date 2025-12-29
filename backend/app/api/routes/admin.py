@@ -17,8 +17,10 @@ from app.models import (
     AdminStats,
     # Post model
     Post,
+    # Notification models
+    Notification, NotificationType,
 )
-from app.models.base import Message  # Simple response message (avoid conflict)
+from app.models.base import Message, RankEnum  # Simple response message + RankEnum
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +57,53 @@ async def get_admin_stats(current_user: AdminUser):
     new_threads_today = await ForumThread.find(ForumThread.created_at >= today).count()
     new_comments_today = await ForumComment.find(ForumComment.created_at >= today).count()
     
+    # === CHART DATA ===
+    
+    # Activity for last 7 days
+    activity_last_7_days = []
+    for i in range(6, -1, -1):  # From 6 days ago to today
+        day_start = today - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        
+        users_count = await User.find(
+            User.profile_verified_at >= day_start,
+            User.profile_verified_at < day_end
+        ).count() if hasattr(User, 'profile_verified_at') else 0
+        
+        threads_count = await ForumThread.find(
+            ForumThread.created_at >= day_start,
+            ForumThread.created_at < day_end
+        ).count()
+        
+        comments_count = await ForumComment.find(
+            ForumComment.created_at >= day_start,
+            ForumComment.created_at < day_end
+        ).count()
+        
+        activity_last_7_days.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "users": users_count,
+            "threads": threads_count,
+            "comments": comments_count,
+        })
+    
+    # Reports by target type
+    reports_by_type = {}
+    for target_type in ReportTargetType:
+        count = await Report.find(Report.target_type == target_type).count()
+        if count > 0:  # Only include types with reports
+            reports_by_type[target_type.value] = count
+    
+    # Users by rank
+    users_by_rank = {}
+    for rank in RankEnum:
+        count = await User.find(User.rank == rank).count()
+        users_by_rank[rank.value] = count
+    
     return AdminStats(
         total_users=total_users,
         users_by_role=users_by_role,
+        users_by_rank=users_by_rank,
         total_categories=total_categories,
         total_threads=total_threads,
         total_forum_comments=total_forum_comments,
@@ -65,6 +111,8 @@ async def get_admin_stats(current_user: AdminUser):
         new_users_today=new_users_today,
         new_threads_today=new_threads_today,
         new_comments_today=new_comments_today,
+        activity_last_7_days=activity_last_7_days,
+        reports_by_type=reports_by_type,
     )
 
 
@@ -370,6 +418,7 @@ async def resolve_report(
         raise HTTPException(status_code=400, detail="Report already resolved")
     
     action_taken = "no action"
+    content_owner_id = None  # Track content owner for notification
     
     # Execute the selected action if status is RESOLVED
     if resolve_in.status == ReportStatus.RESOLVED and resolve_in.action:
@@ -381,24 +430,28 @@ async def resolve_report(
                     thread.status = ThreadStatus.HIDDEN
                     await thread.save()
                     action_taken = "content hidden"
+                    content_owner_id = thread.author_id
             elif report.target_type == ReportTargetType.COMMENT:
                 comment = await ForumComment.get(report.target_id)
                 if comment:
                     comment.status = ForumCommentStatus.HIDDEN
                     await comment.save()
                     action_taken = "content hidden"
+                    content_owner_id = comment.author_id
             elif report.target_type == ReportTargetType.POST:
                 post = await Post.get(report.target_id)
                 if post:
                     post.is_hidden = True
                     await post.save()
                     action_taken = "content hidden"
+                    content_owner_id = post.author_id
                     
         elif resolve_in.action == ReportAction.DELETE_CONTENT:
             # Soft delete content
             if report.target_type == ReportTargetType.THREAD:
                 thread = await ForumThread.get(report.target_id)
                 if thread:
+                    content_owner_id = thread.author_id
                     # Update category count
                     category = await ForumCategory.get(thread.category_id)
                     if category:
@@ -410,21 +463,63 @@ async def resolve_report(
             elif report.target_type == ReportTargetType.COMMENT:
                 comment = await ForumComment.get(report.target_id)
                 if comment:
+                    content_owner_id = comment.author_id
                     comment.status = ForumCommentStatus.DELETED
                     await comment.save()
                     action_taken = "content deleted"
             elif report.target_type == ReportTargetType.POST:
                 post = await Post.get(report.target_id)
                 if post:
+                    content_owner_id = post.author_id
                     await post.delete()
                     action_taken = "content deleted"
                     
         elif resolve_in.action == ReportAction.WARN_USER:
-            # Just record the warning in moderator note
+            # Get content owner for warning
+            if report.target_type == ReportTargetType.THREAD:
+                thread = await ForumThread.get(report.target_id)
+                if thread:
+                    content_owner_id = thread.author_id
+            elif report.target_type == ReportTargetType.COMMENT:
+                comment = await ForumComment.get(report.target_id)
+                if comment:
+                    content_owner_id = comment.author_id
+            elif report.target_type == ReportTargetType.POST:
+                post = await Post.get(report.target_id)
+                if post:
+                    content_owner_id = post.author_id
             action_taken = "user warned"
             
         elif resolve_in.action == ReportAction.IGNORE:
             action_taken = "ignored"
+    
+    # Send notification to content owner if action was taken
+    if content_owner_id and resolve_in.action and resolve_in.action != ReportAction.IGNORE:
+        target_type_labels = {
+            ReportTargetType.THREAD: "bài viết",
+            ReportTargetType.COMMENT: "bình luận",
+            ReportTargetType.USER: "tài khoản",
+            ReportTargetType.POST: "bài đăng",
+        }
+        target_label = target_type_labels.get(report.target_type, "nội dung")
+        
+        if resolve_in.action == ReportAction.WARN_USER:
+            owner_notification = Notification(
+                user_id=content_owner_id,
+                actor_id=current_user.id,
+                type=NotificationType.CONTENT_WARNING,
+                report_id=report.id,
+                content=f"Bạn nhận được cảnh cáo về {target_label} của mình do vi phạm quy định cộng đồng.",
+            )
+        else:  # HIDE_CONTENT or DELETE_CONTENT
+            owner_notification = Notification(
+                user_id=content_owner_id,
+                actor_id=current_user.id,
+                type=NotificationType.CONTENT_REMOVED,
+                report_id=report.id,
+                content=f"{target_label.capitalize()} của bạn đã bị xóa do vi phạm quy định cộng đồng.",
+            )
+        await owner_notification.insert()
     
     # Update the current report
     report.status = resolve_in.status
@@ -432,6 +527,29 @@ async def resolve_report(
     report.moderator_note = resolve_in.moderator_note
     report.resolved_at = datetime.now(UTC)
     await report.save()
+    
+    # Send notification to the reporter
+    target_type_labels = {
+        ReportTargetType.THREAD: "bài viết",
+        ReportTargetType.COMMENT: "bình luận", 
+        ReportTargetType.USER: "người dùng",
+        ReportTargetType.POST: "bài đăng",
+    }
+    target_label = target_type_labels.get(report.target_type, "nội dung")
+    
+    if resolve_in.status == ReportStatus.RESOLVED:
+        notification_content = f"Báo cáo {target_label} của bạn đã được xử lý. Cảm ơn bạn đã đóng góp!"
+    else:
+        notification_content = f"Báo cáo {target_label} của bạn đã được xem xét và bỏ qua."
+    
+    notification = Notification(
+        user_id=report.reporter_id,
+        actor_id=current_user.id,
+        type=NotificationType.REPORT_RESOLVED,
+        report_id=report.id,
+        content=notification_content,
+    )
+    await notification.insert()
     
     # Auto-resolve other pending reports for the same target
     other_reports = await Report.find(
@@ -449,6 +567,16 @@ async def resolve_report(
         other_report.resolved_at = datetime.now(UTC)
         await other_report.save()
         resolved_count += 1
+        
+        # Also notify other reporters
+        other_notification = Notification(
+            user_id=other_report.reporter_id,
+            actor_id=current_user.id,
+            type=NotificationType.REPORT_RESOLVED,
+            report_id=other_report.id,
+            content=notification_content,
+        )
+        await other_notification.insert()
     
     status_text = "resolved" if resolve_in.status == ReportStatus.RESOLVED else "dismissed"
     extra_msg = f" (+{resolved_count} related reports)" if resolved_count > 0 else ""
