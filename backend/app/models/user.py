@@ -25,6 +25,7 @@ class UserBase(BaseModel):
     main_role: Optional[GameRoleEnum] = None
     level: Optional[int] = None
     avatar_url: Optional[str] = Field(default=None, max_length=500)
+    cover_image_url: Optional[str] = Field(default=None, max_length=500)
     profile_screenshot_url: Optional[str] = Field(default=None, max_length=500)
     profile_verified: bool = False
     profile_verified_at: Optional[datetime] = None
@@ -88,6 +89,7 @@ class UserUpdate(BaseModel):
     main_role: Optional[GameRoleEnum] = None
     level: Optional[int] = None
     avatar_url: Optional[str] = Field(default=None, max_length=500)
+    cover_image_url: Optional[str] = Field(default=None, max_length=500)
     profile_screenshot_url: Optional[str] = Field(default=None, max_length=500)
     profile_verified: Optional[bool] = None
     profile_verified_at: Optional[datetime] = None
