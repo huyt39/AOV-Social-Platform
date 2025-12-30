@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import emails  # type: ignore
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 import jwt
 from jinja2 import Template
 from jwt.exceptions import InvalidTokenError
@@ -37,22 +38,21 @@ def send_email(
     html_content: str = "",
 ) -> None:
     assert settings.emails_enabled, "no provided configuration for email variables"
-    message = emails.Message(
+    
+    message = Mail(
+        from_email=settings.EMAILS_FROM_EMAIL,
+        to_emails=email_to,
         subject=subject,
-        html=html_content,
-        mail_from=(settings.EMAILS_FROM_NAME, settings.EMAILS_FROM_EMAIL),
+        html_content=html_content,
     )
-    smtp_options = {"host": settings.SMTP_HOST, "port": settings.SMTP_PORT}
-    if settings.SMTP_TLS:
-        smtp_options["tls"] = True
-    elif settings.SMTP_SSL:
-        smtp_options["ssl"] = True
-    if settings.SMTP_USER:
-        smtp_options["user"] = settings.SMTP_USER
-    if settings.SMTP_PASSWORD:
-        smtp_options["password"] = settings.SMTP_PASSWORD
-    response = message.send(to=email_to, smtp=smtp_options)
-    logger.info(f"send email result: {response}")
+    
+    try:
+        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
+        response = sg.send(message)
+        logger.info(f"send email result: status_code={response.status_code}")
+    except Exception as e:
+        logger.error(f"send email error: {e}")
+        raise
 
 
 def generate_test_email(email_to: str) -> EmailData:
@@ -68,7 +68,7 @@ def generate_test_email(email_to: str) -> EmailData:
 def generate_reset_password_email(email_to: str, email: str, token: str) -> EmailData:
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Password recovery for user {email}"
-    link = f"{settings.FRONTEND_HOST}/reset-password?token={token}"
+    link = f"{settings.FRONTEND_HOST}/#reset-password?token={token}"
     html_content = render_email_template(
         template_name="reset_password.html",
         context={
