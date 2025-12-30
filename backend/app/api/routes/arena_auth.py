@@ -225,6 +225,7 @@ async def login_arena_user(
             "username": user.username,
             "email": user.email,
             "avatar_url": user.avatar_url,
+            "cover_image_url": user.cover_image_url,
             "rank": user.rank.value if user.rank else None,
             "main_role": user.main_role.value if user.main_role else None,
             "level": user.level,
@@ -319,6 +320,7 @@ async def get_current_profile(
             "username": current_user.username,
             "email": current_user.email,
             "avatar_url": current_user.avatar_url,
+            "cover_image_url": current_user.cover_image_url,
             "rank": current_user.rank.value if current_user.rank else None,
             "main_role": current_user.main_role.value if current_user.main_role else None,
             "level": current_user.level,
@@ -355,6 +357,7 @@ async def get_user_profile(
             "id": user.id,
             "username": user.username,
             "avatar_url": user.avatar_url,
+            "cover_image_url": user.cover_image_url,
             "rank": user.rank.value if user.rank else None,
             "main_role": user.main_role.value if user.main_role else None,
             "level": user.level,
@@ -386,6 +389,30 @@ async def update_avatar(
     return {
         "success": True,
         "avatar_url": current_user.avatar_url,
+    }
+
+
+class CoverImageUpdate(BaseModel):
+    """Request model for cover image update."""
+    cover_image_url: str
+
+
+@router.patch("/me/cover-image")
+async def update_cover_image(
+    cover_data: CoverImageUpdate,
+    current_user: CurrentUser,
+) -> dict[str, Any]:
+    """
+    Update current user's cover image URL.
+    """
+    current_user.cover_image_url = cover_data.cover_image_url
+    await current_user.save()
+    
+    logger.info(f"User {current_user.username} updated cover image")
+    
+    return {
+        "success": True,
+        "cover_image_url": current_user.cover_image_url,
     }
 
 
