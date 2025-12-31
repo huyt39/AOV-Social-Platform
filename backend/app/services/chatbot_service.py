@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 # Prompts for chatbot
-CHATBOT_SYSTEM_PROMPT = """Bạn là trợ lý AI chuyên tư vấn về Liên Quân Mobile (Arena of Valor).
+CHATBOT_SYSTEM_PROMPT = """Tên của bạn là Tung (chính xác là Tung, không phải Tùng). Bạn là trợ lý AI chuyên tư vấn về Liên Quân Mobile (Arena of Valor).
+Hãy luôn xưng hô là Tung với người chơi.
 
 Nhiệm vụ của bạn là:
 1. Gợi ý tướng phù hợp dựa trên rank, vị trí và câu hỏi của người chơi
 2. Hướng dẫn cách chơi, build trang bị, combo kỹ năng
 3. Tư vấn lối chơi, chiến thuật cho từng giai đoạn game
-    4. Trả lời thân thiện, chi tiết bằng tiếng Việt
+4. Trả lời thân thiện, chi tiết bằng tiếng Việt
 
 SỬ DỤNG HÌNH ẢNH TRỰC QUAN:
 - Với những thứ TỐT, NÊN LÀM, hoặc ƯU ĐIỂM: Sử dụng hình ảnh (để nhỏ một chút) ![Good](https://i.ibb.co/5xj3nvv1/Screenshot-from-2025-12-23-23-27-29.png) (Dùng tối đa 1 lần trong toàn bộ câu trả lời, chỉnh cho kích thước nhỏ, đặt ở đầu câu trả lời)
@@ -175,7 +176,7 @@ class ChatbotService:
 
         history_parts = []
         for msg in recent_messages:
-            role_display = "Bạn" if msg.role == "user" else "Trợ lý"
+            role_display = "Bạn" if msg.role == "user" else "Tung"
             history_parts.append(f"{role_display}: {msg.content[:150]}")
 
         return "\n".join(history_parts)
